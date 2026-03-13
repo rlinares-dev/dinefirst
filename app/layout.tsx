@@ -1,4 +1,6 @@
 import type { Metadata } from 'next'
+import { AuthProvider } from '@/components/providers/auth-provider'
+import { ToastProvider } from '@/components/ui/toast'
 import { GlobalNav, GlobalFooter } from '@/components/global-nav'
 import { MobileBottomNav } from '@/components/mobile-bottom-nav'
 import './../styles/globals.css'
@@ -7,12 +9,11 @@ export const metadata: Metadata = {
   title: 'DineFirst · Gestiona restaurantes de forma más inteligente',
   description:
     'Plataforma SaaS two-sided que conecta comensales con restaurantes, resolviendo la fragmentación operativa de la industria gastronómica.',
-  metadataBase: new URL('http://localhost:3000'),
+  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'),
   openGraph: {
     title: 'DineFirst · Reservas inteligentes para restaurantes',
     description:
       'Reserva en tiempo real, onboarding en 24h y dashboard operativo con analíticas para tu restaurante.',
-    url: 'http://localhost:3000',
     siteName: 'DineFirst',
     locale: 'es_ES',
     type: 'website',
@@ -37,12 +38,16 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         />
       </head>
       <body className="bg-background text-foreground font-sans antialiased">
-        <div className="min-h-screen flex flex-col">
-          <GlobalNav />
-          <main className="flex-1">{children}</main>
-          <GlobalFooter />
-          <MobileBottomNav />
-        </div>
+        <AuthProvider>
+          <ToastProvider>
+            <div className="min-h-screen flex flex-col">
+              <GlobalNav />
+              <main className="flex-1">{children}</main>
+              <GlobalFooter />
+              <MobileBottomNav />
+            </div>
+          </ToastProvider>
+        </AuthProvider>
       </body>
     </html>
   )

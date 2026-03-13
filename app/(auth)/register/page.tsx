@@ -2,10 +2,12 @@
 
 import { useState } from 'react'
 import clsx from 'clsx'
-import { generateId, setUser } from '@/lib/data'
+import { useAuth } from '@/components/providers/auth-provider'
+import { isSupabaseConfigured } from '@/lib/env'
 import type { Role } from '@/types/database'
 
 export default function RegisterPage() {
+  const { signUp, signInWithGoogle } = useAuth()
   const [step, setStep] = useState<1 | 2>(1)
   const [role, setRole] = useState<Role>('comensal')
   const [name, setName] = useState('')
@@ -30,17 +32,33 @@ export default function RegisterPage() {
     }
     setLoading(true)
     setError('')
-    await new Promise((r) => setTimeout(r, 800))
 
-    const user = {
-      id: generateId(),
-      name,
-      email,
-      role,
-      phone,
-      createdAt: new Date().toISOString(),
+    const signUpRole = role === 'admin' ? 'comensal' : role
+    const result = await signUp({ email, password, name, role: signUpRole, phone })
+
+    if (result.error) {
+      setError(result.error)
+      setLoading(false)
+      return
     }
-    setUser(user)
+
+    // Si es restaurante en modo localStorage, crear restaurante
+    if (!isSupabaseConfigured() && role === 'restaurante' && restaurantName) {
+      const { saveRestaurant, generateId, getUser } = require('@/lib/data')
+      const u = getUser()
+      if (u) {
+        saveRestaurant({
+          id: generateId(),
+          ownerId: u.id,
+          name: restaurantName,
+          slug: restaurantName.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, ''),
+          city: city || 'madrid',
+          address: '', cuisineType: '', capacity: 20, description: '',
+          plan: 'basic' as const, isActive: true, rating: 0, reviewCount: 0,
+          phone, openingHours: '', createdAt: new Date().toISOString(),
+        })
+      }
+    }
 
     if (role === 'restaurante') window.location.href = '/dashboard'
     else window.location.href = '/app'
