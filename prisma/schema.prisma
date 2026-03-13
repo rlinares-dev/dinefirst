@@ -1,0 +1,92 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Profile {
+  id          String        @id @default(uuid())
+  role        String        @default("comensal")
+  name        String
+  avatarUrl   String?
+  createdAt   DateTime      @default(now())
+  restaurants Restaurant[]
+  reservations Reservation[]
+}
+
+model Restaurant {
+  id               String        @id @default(uuid())
+  ownerId          String
+  name             String
+  slug             String        @unique
+  city             String
+  address          String
+  lat              Float
+  lng              Float
+  cuisineType      String
+  capacity         Int
+  description      String?
+  coverImage       String?
+  stripeCustomerId String?
+  plan             String        @default("basic")
+  isActive         Boolean       @default(true)
+  createdAt        DateTime      @default(now())
+  owner            Profile       @relation(fields: [ownerId], references: [id])
+  tables           Table[]
+  reservations     Reservation[]
+  menuItems        MenuItem[]
+}
+
+model Table {
+  id           String   @id @default(uuid())
+  restaurantId String
+  name         String
+  capacity     Int
+  isActive     Boolean  @default(true)
+  restaurant   Restaurant @relation(fields: [restaurantId], references: [id])
+  timeSlots    TimeSlot[]
+  reservations Reservation[]
+}
+
+model TimeSlot {
+  id           String   @id @default(uuid())
+  restaurantId String
+  tableId      String
+  date         DateTime
+  startTime    String
+  endTime      String
+  isAvailable  Boolean  @default(true)
+  table        Table    @relation(fields: [tableId], references: [id])
+  reservation  Reservation?
+}
+
+model Reservation {
+  id               String            @id @default(uuid())
+  userId           String
+  restaurantId     String
+  tableId          String
+  timeSlotId       String            @unique
+  partySize        Int
+  status           String            @default("pending")
+  specialRequests  String?
+  confirmationCode String            @unique
+  createdAt        DateTime          @default(now())
+  user             Profile           @relation(fields: [userId], references: [id])
+  restaurant       Restaurant        @relation(fields: [restaurantId], references: [id])
+  timeSlot         TimeSlot          @relation(fields: [timeSlotId], references: [id])
+  table            Table             @relation(fields: [tableId], references: [id])
+}
+
+model MenuItem {
+  id           String     @id @default(uuid())
+  restaurantId String
+  name         String
+  description  String?
+  price        Float
+  isActive     Boolean    @default(true)
+  restaurant   Restaurant @relation(fields: [restaurantId], references: [id])
+}
+

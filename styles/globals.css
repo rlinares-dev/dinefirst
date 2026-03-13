@@ -1,0 +1,283 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ─── Custom scrollbar ──────────────────────────────────────────── */
+::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(249, 115, 22, 0.35);
+  border-radius: 99px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(249, 115, 22, 0.6);
+}
+
+/* ─── Selection ─────────────────────────────────────────────────── */
+::selection {
+  background-color: rgba(249, 115, 22, 0.28);
+  color: #f9fafb;
+}
+
+/* ─── Base ──────────────────────────────────────────────────────── */
+html,
+body {
+  height: 100%;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  @apply bg-background text-foreground;
+}
+
+main {
+  @apply bg-background min-h-screen;
+}
+
+a {
+  @apply transition-colors duration-150;
+}
+
+/* ─── Typography scale ──────────────────────────────────────────── */
+@layer base {
+  h1 {
+    @apply text-3xl font-semibold tracking-tight text-foreground md:text-4xl;
+  }
+  h2 {
+    @apply text-2xl font-semibold tracking-tight text-foreground;
+  }
+  h3 {
+    @apply text-base font-semibold text-foreground;
+  }
+  p {
+    @apply text-foreground-subtle leading-relaxed;
+  }
+}
+
+/* ─── Component library ─────────────────────────────────────────── */
+@layer components {
+
+  /* ── Buttons — pill shape, solid fills ─────────────────────────── */
+  .btn-primary {
+    @apply relative inline-flex items-center justify-center
+      rounded-full px-6 py-2.5 text-sm font-semibold text-white
+      transition-all duration-200 ease-out
+      focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 focus-visible:ring-offset-2 focus-visible:ring-offset-background
+      disabled:cursor-not-allowed disabled:opacity-50;
+    background: #F97316;
+  }
+  .btn-primary:hover:not(:disabled) {
+    background: #EA580C;
+    transform: translateY(-1px);
+  }
+  .btn-primary:active:not(:disabled) {
+    transform: translateY(0);
+    background: #C2410C;
+  }
+
+  .btn-secondary {
+    @apply inline-flex items-center justify-center rounded-full
+      px-6 py-2.5 text-sm font-medium text-foreground
+      transition-all duration-200 ease-out
+      focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border-strong focus-visible:ring-offset-2 focus-visible:ring-offset-background
+      disabled:cursor-not-allowed disabled:opacity-40;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    background: rgba(255, 255, 255, 0.04);
+  }
+  .btn-secondary:hover:not(:disabled) {
+    border-color: rgba(249, 115, 22, 0.35);
+    color: #F97316;
+    background: rgba(249, 115, 22, 0.06);
+  }
+
+  .btn-ghost {
+    @apply inline-flex items-center justify-center rounded-full
+      px-4 py-2 text-sm font-medium text-foreground-subtle
+      transition-all duration-150
+      hover:bg-white/[0.05] hover:text-foreground
+      focus-visible:outline-none;
+  }
+
+  /* ── Cards — solid dark, NO glass morphism ────────────────────── */
+  .card {
+    @apply rounded-2xl px-5 py-4;
+    background: #1a1a1a;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
+    transition: border-color 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
+  }
+  .card:hover {
+    border-color: rgba(249, 115, 22, 0.25);
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.4);
+  }
+
+  .card-flat {
+    @apply rounded-2xl px-5 py-4;
+    background: #141414;
+    border: 1px solid rgba(255, 255, 255, 0.06);
+  }
+
+  /* ── Pill / badge — clean, no backdrop-filter ──────────────────── */
+  .pill {
+    @apply inline-flex items-center gap-1.5 rounded-full
+      px-3 py-1 text-xs font-medium;
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: #8a8a8a;
+  }
+
+  .pill-accent {
+    @apply inline-flex items-center gap-1.5 rounded-full
+      px-3 py-1 text-xs font-semibold text-accent;
+    background: rgba(249, 115, 22, 0.12);
+    border: 1px solid rgba(249, 115, 22, 0.25);
+  }
+  .pill-active {
+    @apply inline-flex items-center gap-1.5 rounded-full
+      px-3 py-1 text-xs font-semibold text-accent;
+    background: rgba(249, 115, 22, 0.15);
+    border: 1px solid #F97316;
+  }
+
+  .pill-success {
+    @apply inline-flex items-center gap-1.5 rounded-full
+      px-3 py-1 text-xs font-semibold text-success;
+    background: rgba(34, 197, 94, 0.08);
+    border: 1px solid rgba(34, 197, 94, 0.2);
+  }
+
+  /* ── Price display ─────────────────────────────────────────────── */
+  .price {
+    @apply font-bold text-accent;
+  }
+  .price-old {
+    @apply text-sm line-through text-foreground-subtle;
+  }
+
+  /* ── Badges — new, discount ────────────────────────────────────── */
+  .badge-new {
+    @apply inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-bold text-white;
+    background: #F97316;
+  }
+  .badge-discount {
+    @apply inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-bold text-white;
+    background: #EF4444;
+  }
+
+  /* ── Form inputs — dark solid background ───────────────────────── */
+  .input {
+    @apply rounded-xl px-3.5 py-2.5 text-sm text-foreground outline-none
+      transition-all duration-200 placeholder:text-foreground-subtle/50;
+    background: #141414;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+  }
+  .input:focus {
+    border-color: #F97316;
+    box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.12);
+    background: #1a1a1a;
+  }
+  .input:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+
+  /* Select — override native arrow color */
+  select.input {
+    @apply appearance-none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%238a8a8a' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 12px center;
+    padding-right: 2.5rem;
+  }
+
+  /* ── Field label ─────────────────────────────────────────────────── */
+  .field-label {
+    @apply mb-1.5 block text-xs font-semibold uppercase tracking-widest text-foreground-subtle;
+  }
+
+  /* ── Divider ───────────────────────────────────────────────────── */
+  .divider {
+    @apply my-6 border-t;
+    border-color: rgba(255, 255, 255, 0.06);
+  }
+
+  /* ── Status badges ─────────────────────────────────────────────── */
+  .badge-confirmed {
+    @apply pill-success;
+  }
+  .badge-pending {
+    @apply inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold;
+    color: #FDBA74;
+    background: rgba(249, 115, 22, 0.08);
+    border: 1px solid rgba(249, 115, 22, 0.2);
+  }
+  .badge-cancelled {
+    @apply inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold;
+    color: #8a8a8a;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.07);
+  }
+  .badge-no_show {
+    @apply inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold;
+    color: #F87171;
+    background: rgba(239, 68, 68, 0.08);
+    border: 1px solid rgba(239, 68, 68, 0.2);
+  }
+
+  /* ── Glow ring (accent highlight) ──────────────────────────────── */
+  .ring-accent-glow {
+    box-shadow: 0 0 0 2px rgba(249, 115, 22, 0.4);
+  }
+
+  /* ── Stat / KPI — large display numbers ────────────────────────── */
+  .stat-card {
+    @apply card flex flex-col gap-1;
+  }
+  .stat-value {
+    font-size: 2.5rem;
+    font-weight: 800;
+    color: #F97316;
+    line-height: 1;
+  }
+  .stat-label {
+    @apply text-sm text-foreground-subtle;
+  }
+  .stat-sub {
+    @apply text-xs text-foreground-subtle;
+  }
+}
+
+/* ─── Utility animations ────────────────────────────────────────── */
+@layer utilities {
+  .animate-fade-in {
+    animation: fadeIn 0.4s ease forwards;
+  }
+  .animate-slide-up {
+    animation: slideUp 0.4s ease forwards;
+  }
+  .animate-slide-down {
+    animation: slideDown 0.3s ease forwards;
+  }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(14px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes slideDown {
+  from { opacity: 0; transform: translateY(-8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
