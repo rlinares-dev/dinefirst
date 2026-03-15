@@ -14,6 +14,8 @@ import {
 import type { Table, Order, OrderStatus } from '@/types/database'
 import { usePolling } from '@/lib/hooks/use-polling'
 import { playOrderSound } from '@/lib/sounds'
+import { PageTransition } from '@/components/ui/page-transition'
+import { StaggeredList } from '@/components/ui/staggered-list'
 
 const STATUS_LABELS: Record<OrderStatus, string> = {
   pending: 'Pendiente',
@@ -113,7 +115,7 @@ export default function SessionDetailPage() {
   const pendingCount = orders.filter((o) => o.status === 'pending').length
 
   return (
-    <div className="space-y-6">
+    <PageTransition className="space-y-6">
       {/* Header */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
@@ -169,7 +171,7 @@ export default function SessionDetailPage() {
           <p className="text-sm text-foreground-subtle mt-1">Los pedidos del cliente aparecerán aquí</p>
         </div>
       ) : (
-        <div className="space-y-3">
+        <StaggeredList className="space-y-3">
           {orders.map((order) => {
             const orderTotal = order.items.reduce((s, i) => s + i.price * i.quantity, 0)
             const isExpanded = expandedOrder === order.id
@@ -246,8 +248,8 @@ export default function SessionDetailPage() {
               </div>
             )
           })}
-        </div>
+        </StaggeredList>
       )}
-    </div>
+    </PageTransition>
   )
 }

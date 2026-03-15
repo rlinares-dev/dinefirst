@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import clsx from 'clsx'
-import { getUser, getRestaurantsForOwner, getReservationsForRestaurant, updateReservationStatus, getReviewsForRestaurant, saveRestaurant, getRestaurantById, compressImage } from '@/lib/data'
+import { getUser, getRestaurantsForOwner, getReservationsForRestaurant, updateReservationStatus, getReviewsForRestaurant, saveRestaurant, getRestaurantById, compressImage, getOrdersForRestaurant, getSessionsForRestaurant } from '@/lib/data'
 import type { Restaurant, Reservation, ReservationStatus, Review } from '@/types/database'
 
 const STATUS_LABEL: Record<ReservationStatus, string> = {
@@ -108,9 +108,19 @@ export default function DashboardHomePage() {
   const pendingCount = reservations.filter((r) => r.status === 'pending').length
   const occupancyPct = restaurant ? Math.round((confirmedToday / (restaurant.capacity / 4)) * 100) : 0
 
+  // TPV stats
+  const allOrders = getOrdersForRestaurant('rest-1')
+  const todayOrders = allOrders.filter((o) => o.createdAt.slice(0, 10) === today)
+  const todayRevenue = allOrders
+    .filter((o) => o.status !== 'cancelled')
+    .reduce((sum, o) => sum + o.items.reduce((s, i) => s + i.price * i.quantity, 0), 0)
+  const activeSessions = getSessionsForRestaurant('rest-1').filter((s) => !s.closedAt).length
+
   const stats = [
     { label: 'Reservas hoy', value: totalToday, sub: `${confirmedToday} confirmadas`, color: 'text-accent' },
     { label: 'Pendientes', value: pendingCount, sub: 'Requieren atencion', color: 'text-yellow-400' },
+    { label: 'Pedidos hoy', value: todayOrders.length, sub: `${activeSessions} sesiones activas`, color: 'text-emerald-400' },
+    { label: 'Ingresos', value: `${todayRevenue.toFixed(0)}€`, sub: `${allOrders.length} pedidos total`, color: 'text-success' },
     { label: 'Ocupacion est.', value: `${Math.min(occupancyPct, 100)}%`, sub: `Capacidad: ${restaurant?.capacity ?? 0}`, color: 'text-success' },
     { label: 'Rating', value: restaurant?.rating ?? 0, sub: `${restaurant?.reviewCount ?? 0} resenas`, color: 'text-accent-soft' },
   ]
@@ -140,7 +150,7 @@ export default function DashboardHomePage() {
       </div>
 
       {/* KPI grid */}
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
         {stats.map((s) => (
           <div key={s.label} className="stat-card">
             <p className="stat-label">{s.label}</p>

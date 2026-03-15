@@ -16,6 +16,11 @@ import { usePolling } from '@/lib/hooks/use-polling'
 import { useBroadcast } from '@/lib/hooks/use-broadcast'
 import { playOrderSound } from '@/lib/sounds'
 import TableTile from '@/components/tpv/table-tile'
+import { useTableTimeout } from '@/lib/hooks/use-table-timeout'
+import { PageTransition } from '@/components/ui/page-transition'
+import { StaggeredGrid } from '@/components/ui/staggered-list'
+import { AnimatedCounter } from '@/components/ui/counter'
+import { useToast } from '@/components/ui/toast'
 
 const RESTAURANT_ID = 'rest-1'
 const POLL_INTERVAL = 5000
@@ -42,6 +47,7 @@ export default function TPVPage() {
   const [prevPendingCount, setPrevPendingCount] = useState(0)
   const [sessionMap, setSessionMap] = useState<Record<string, string>>({})
   const [pendingMap, setPendingMap] = useState<Record<string, number>>({})
+  const { info } = useToast()
 
   const { broadcast } = useBroadcast<string>(() => {
     // On cross-tab message, refresh data
@@ -70,17 +76,19 @@ export default function TPVPage() {
     })
     setPendingMap(pMap)
 
-    // Play sound if new pending orders appeared
+    // Play sound + toast if new pending orders appeared
     const totalPending = pendingOrders.length
     setPrevPendingCount((prev) => {
       if (totalPending > prev && prev > 0) {
         playOrderSound()
+        info(`Nuevo pedido recibido (${totalPending} pendientes)`)
       }
       return totalPending
     })
   }, [])
 
   usePolling(refreshData, POLL_INTERVAL)
+  useTableTimeout(RESTAURANT_ID)
 
   function handleOccupy(table: Table) {
     createSession(table.id, RESTAURANT_ID)
@@ -121,7 +129,7 @@ export default function TPVPage() {
   const activeSessions = getSessionsForRestaurant(RESTAURANT_ID).filter((s) => !s.closedAt).length
 
   return (
-    <div className="space-y-6">
+    <PageTransition className="space-y-6">
       {/* Header */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
@@ -151,7 +159,7 @@ export default function TPVPage() {
         ].map((s) => (
           <div key={s.label} className="card">
             <p className="text-xs text-foreground-subtle">{s.label}</p>
-            <p className={clsx('mt-1 text-2xl font-bold', s.color)}>{s.value}</p>
+            <AnimatedCounter value={s.value} className={clsx('mt-1 text-2xl font-bold', s.color)} />
           </div>
         ))}
       </div>
@@ -183,7 +191,7 @@ export default function TPVPage() {
           <p className="text-sm text-foreground-subtle mt-1">Cambia el filtro o añade mesas en la sección Mesas</p>
         </div>
       ) : (
-        <div className="grid gap-3 grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+        <StaggeredGrid className="grid gap-3 grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
           {filtered.map((t) => (
             <TableTile
               key={t.id}
@@ -195,8 +203,8 @@ export default function TPVPage() {
               onClick={() => handleClick(t)}
             />
           ))}
-        </div>
+        </StaggeredGrid>
       )}
-    </div>
+    </PageTransition>
   )
 }

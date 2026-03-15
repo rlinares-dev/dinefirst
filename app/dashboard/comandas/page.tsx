@@ -12,6 +12,8 @@ import { usePolling } from '@/lib/hooks/use-polling'
 import { useBroadcast } from '@/lib/hooks/use-broadcast'
 import { playOrderSound } from '@/lib/sounds'
 import ComandaCard from '@/components/comandas/comanda-card'
+import { PageTransition } from '@/components/ui/page-transition'
+import { StaggeredGrid } from '@/components/ui/staggered-list'
 
 const RESTAURANT_ID = 'rest-1'
 
@@ -69,7 +71,7 @@ export default function ComandasPage() {
   ]
 
   return (
-    <div className="space-y-6">
+    <PageTransition className="space-y-6">
       {/* Header */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
@@ -132,7 +134,7 @@ export default function ComandasPage() {
           <p className="text-sm text-foreground-subtle mt-1">Las nuevas comandas aparecerán aquí</p>
         </div>
       ) : (
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        <StaggeredGrid className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {filtered.map((order) => (
             <ComandaCard
               key={order.id}
@@ -141,8 +143,8 @@ export default function ComandasPage() {
               onStatusChange={handleStatusChange}
             />
           ))}
-        </div>
+        </StaggeredGrid>
       )}
-    </div>
+    </PageTransition>
   )
 }

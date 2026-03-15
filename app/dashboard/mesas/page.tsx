@@ -307,6 +307,12 @@ export default function DashboardTablesPage() {
               >
                 Copiar URL
               </button>
+              <a
+                href={`/dashboard/mesas/qr/${qrModal.id}`}
+                className="btn-secondary flex-1 text-xs text-center"
+              >
+                Imprimir
+              </a>
               <button onClick={() => setQrModal(null)} className="btn-secondary flex-1 text-xs">
                 Cerrar
               </button>
