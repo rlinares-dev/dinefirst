@@ -1,4 +1,4 @@
-import type { User, Restaurant, Table, MenuItem, Reservation, Review } from '@/types/database'
+import type { User, Restaurant, Table, MenuItem, Reservation, Review, TableSession, Order } from '@/types/database'
 
 export const MOCK_USERS: User[] = [
   {
@@ -97,22 +97,129 @@ export const MOCK_RESTAURANTS: Restaurant[] = [
 
 export const MOCK_TABLES: Table[] = [
   // La Taberna del Chef
-  { id: 't1-1', restaurantId: 'rest-1', name: 'Mesa 1', capacity: 2, isActive: true, location: 'Terraza' },
-  { id: 't1-2', restaurantId: 'rest-1', name: 'Mesa 2', capacity: 4, isActive: true, location: 'Interior' },
-  { id: 't1-3', restaurantId: 'rest-1', name: 'Mesa 3', capacity: 4, isActive: true, location: 'Interior' },
-  { id: 't1-4', restaurantId: 'rest-1', name: 'Mesa 4', capacity: 6, isActive: true, location: 'Privado' },
-  { id: 't1-5', restaurantId: 'rest-1', name: 'Mesa 5', capacity: 2, isActive: false, location: 'Barra' },
-  { id: 't1-6', restaurantId: 'rest-1', name: 'Mesa 6', capacity: 8, isActive: true, location: 'Privado' },
+  { id: 't1-1', restaurantId: 'rest-1', name: 'Mesa 1', capacity: 2, status: 'occupied', location: 'Terraza', qrCode: 'df-rest1-t1' },
+  { id: 't1-2', restaurantId: 'rest-1', name: 'Mesa 2', capacity: 4, status: 'free', location: 'Interior', qrCode: 'df-rest1-t2' },
+  { id: 't1-3', restaurantId: 'rest-1', name: 'Mesa 3', capacity: 4, status: 'occupied', location: 'Interior', qrCode: 'df-rest1-t3' },
+  { id: 't1-4', restaurantId: 'rest-1', name: 'Mesa 4', capacity: 6, status: 'reserved', location: 'Privado', qrCode: 'df-rest1-t4' },
+  { id: 't1-5', restaurantId: 'rest-1', name: 'Mesa 5', capacity: 2, status: 'inactive', location: 'Barra', qrCode: 'df-rest1-t5' },
+  { id: 't1-6', restaurantId: 'rest-1', name: 'Mesa 6', capacity: 8, status: 'free', location: 'Privado', qrCode: 'df-rest1-t6' },
   // El Rincón de la Abuela
-  { id: 't2-1', restaurantId: 'rest-2', name: 'Mesa A', capacity: 2, isActive: true, location: 'Patio' },
-  { id: 't2-2', restaurantId: 'rest-2', name: 'Mesa B', capacity: 4, isActive: true, location: 'Sala principal' },
-  { id: 't2-3', restaurantId: 'rest-2', name: 'Mesa C', capacity: 4, isActive: true, location: 'Sala principal' },
-  { id: 't2-4', restaurantId: 'rest-2', name: 'Mesa D', capacity: 6, isActive: true, location: 'Sala principal' },
+  { id: 't2-1', restaurantId: 'rest-2', name: 'Mesa A', capacity: 2, status: 'free', location: 'Patio', qrCode: 'df-rest2-tA' },
+  { id: 't2-2', restaurantId: 'rest-2', name: 'Mesa B', capacity: 4, status: 'en_route', location: 'Sala principal', qrCode: 'df-rest2-tB' },
+  { id: 't2-3', restaurantId: 'rest-2', name: 'Mesa C', capacity: 4, status: 'free', location: 'Sala principal', qrCode: 'df-rest2-tC' },
+  { id: 't2-4', restaurantId: 'rest-2', name: 'Mesa D', capacity: 6, status: 'occupied', location: 'Sala principal', qrCode: 'df-rest2-tD' },
   // Sake & Fusion
-  { id: 't3-1', restaurantId: 'rest-3', name: 'Barra 1', capacity: 2, isActive: true, location: 'Barra omakase' },
-  { id: 't3-2', restaurantId: 'rest-3', name: 'Barra 2', capacity: 2, isActive: true, location: 'Barra omakase' },
-  { id: 't3-3', restaurantId: 'rest-3', name: 'Mesa 1', capacity: 4, isActive: true, location: 'Sala' },
-  { id: 't3-4', restaurantId: 'rest-3', name: 'Mesa 2', capacity: 4, isActive: true, location: 'Sala' },
+  { id: 't3-1', restaurantId: 'rest-3', name: 'Barra 1', capacity: 2, status: 'occupied', location: 'Barra omakase', qrCode: 'df-rest3-t1' },
+  { id: 't3-2', restaurantId: 'rest-3', name: 'Barra 2', capacity: 2, status: 'free', location: 'Barra omakase', qrCode: 'df-rest3-t2' },
+  { id: 't3-3', restaurantId: 'rest-3', name: 'Mesa 1', capacity: 4, status: 'free', location: 'Sala', qrCode: 'df-rest3-t3' },
+  { id: 't3-4', restaurantId: 'rest-3', name: 'Mesa 2', capacity: 4, status: 'reserved', location: 'Sala', qrCode: 'df-rest3-t4' },
+]
+
+export const MOCK_SESSIONS: TableSession[] = [
+  {
+    id: 'sess-1',
+    tableId: 't1-1',
+    restaurantId: 'rest-1',
+    startedAt: '2026-03-15T13:15:00Z',
+    closedAt: null,
+    totalAmount: 47,
+  },
+  {
+    id: 'sess-2',
+    tableId: 't1-3',
+    restaurantId: 'rest-1',
+    startedAt: '2026-03-15T14:00:00Z',
+    closedAt: null,
+    totalAmount: 62,
+  },
+  {
+    id: 'sess-3',
+    tableId: 't2-4',
+    restaurantId: 'rest-2',
+    startedAt: '2026-03-15T13:30:00Z',
+    closedAt: null,
+    totalAmount: 48,
+  },
+  {
+    id: 'sess-4',
+    tableId: 't3-1',
+    restaurantId: 'rest-3',
+    startedAt: '2026-03-15T20:45:00Z',
+    closedAt: null,
+    totalAmount: 57,
+  },
+]
+
+export const MOCK_ORDERS: Order[] = [
+  // Mesa 1 rest-1 — sesión sess-1
+  {
+    id: 'ord-1',
+    sessionId: 'sess-1',
+    tableId: 't1-1',
+    restaurantId: 'rest-1',
+    status: 'served',
+    notes: '',
+    createdAt: '2026-03-15T13:20:00Z',
+    items: [
+      { id: 'oi-1', orderId: 'ord-1', menuItemId: 'm1-1', name: 'Croquetas de jamón ibérico', price: 12, quantity: 1, notes: '' },
+      { id: 'oi-2', orderId: 'ord-1', menuItemId: 'm1-2', name: 'Gazpacho de temporada', price: 9, quantity: 1, notes: 'Sin cebolla' },
+    ],
+  },
+  {
+    id: 'ord-2',
+    sessionId: 'sess-1',
+    tableId: 't1-1',
+    restaurantId: 'rest-1',
+    status: 'preparing',
+    notes: '',
+    createdAt: '2026-03-15T13:45:00Z',
+    items: [
+      { id: 'oi-3', orderId: 'ord-2', menuItemId: 'm1-5', name: 'Lubina a la sal', price: 28, quantity: 1, notes: '' },
+    ],
+  },
+  // Mesa 3 rest-1 — sesión sess-2
+  {
+    id: 'ord-3',
+    sessionId: 'sess-2',
+    tableId: 't1-3',
+    restaurantId: 'rest-1',
+    status: 'pending',
+    notes: 'Alérgicos a marisco',
+    createdAt: '2026-03-15T14:05:00Z',
+    items: [
+      { id: 'oi-4', orderId: 'ord-3', menuItemId: 'm1-3', name: 'Steak tartar', price: 18, quantity: 2, notes: '' },
+      { id: 'oi-5', orderId: 'ord-3', menuItemId: 'm1-4', name: 'Cocido madrileño', price: 24, quantity: 1, notes: '' },
+      { id: 'oi-6', orderId: 'ord-3', menuItemId: 'm1-9', name: 'Agua mineral', price: 3, quantity: 2, notes: 'Con gas' },
+    ],
+  },
+  // Mesa D rest-2 — sesión sess-3
+  {
+    id: 'ord-4',
+    sessionId: 'sess-3',
+    tableId: 't2-4',
+    restaurantId: 'rest-2',
+    status: 'served',
+    notes: '',
+    createdAt: '2026-03-15T13:35:00Z',
+    items: [
+      { id: 'oi-7', orderId: 'ord-4', menuItemId: 'm2-1', name: 'Pa amb tomàquet', price: 4, quantity: 3, notes: '' },
+      { id: 'oi-8', orderId: 'ord-4', menuItemId: 'm2-3', name: 'Fideuà de gambas y sepia', price: 22, quantity: 2, notes: '' },
+    ],
+  },
+  // Barra 1 rest-3 — sesión sess-4
+  {
+    id: 'ord-5',
+    sessionId: 'sess-4',
+    tableId: 't3-1',
+    restaurantId: 'rest-3',
+    status: 'preparing',
+    notes: '',
+    createdAt: '2026-03-15T20:50:00Z',
+    items: [
+      { id: 'oi-9', orderId: 'ord-5', menuItemId: 'm3-4', name: 'Omakase del chef (8 piezas)', price: 45, quantity: 1, notes: '' },
+      { id: 'oi-10', orderId: 'ord-5', menuItemId: 'm3-7', name: 'Sake Junmai Daiginjo (copa)', price: 12, quantity: 1, notes: '' },
+    ],
+  },
 ]
 
 export const MOCK_MENU_ITEMS: MenuItem[] = [

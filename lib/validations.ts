@@ -53,7 +53,23 @@ export const tableSchema = z.object({
   name: z.string().min(1, 'Nombre requerido').max(50, 'Máximo 50 caracteres'),
   capacity: z.number().int().min(1, 'Mínimo 1 persona').max(20, 'Máximo 20 personas'),
   location: z.string().max(50, 'Máximo 50 caracteres').default(''),
-  isActive: z.boolean().default(true),
+  status: z.enum(['free', 'occupied', 'en_route', 'reserved', 'inactive']).default('free'),
+})
+
+export const orderItemSchema = z.object({
+  menuItemId: z.string().min(1, 'Item requerido'),
+  name: z.string().min(1),
+  price: z.number().min(0),
+  quantity: z.number().int().min(1, 'Mínimo 1 unidad').max(50, 'Máximo 50 unidades'),
+  notes: z.string().max(200, 'Máximo 200 caracteres').default(''),
+})
+
+export const orderSchema = z.object({
+  sessionId: z.string().min(1, 'Sesión requerida'),
+  tableId: z.string().min(1, 'Mesa requerida'),
+  restaurantId: z.string().min(1, 'Restaurante requerido'),
+  items: z.array(orderItemSchema).min(1, 'Al menos un item requerido'),
+  notes: z.string().max(500, 'Máximo 500 caracteres').default(''),
 })
 
 export const menuItemSchema = z.object({

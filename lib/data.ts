@@ -1,4 +1,4 @@
-import type { User, Restaurant, Table, MenuItem, Reservation, ReservationStatus, Review } from '@/types/database'
+import type { User, Restaurant, Table, MenuItem, Reservation, ReservationStatus, Review, TableStatus, TableSession, Order, OrderStatus, OrderItem } from '@/types/database'
 import {
   MOCK_USERS,
   MOCK_RESTAURANTS,
@@ -6,6 +6,8 @@ import {
   MOCK_MENU_ITEMS,
   MOCK_RESERVATIONS,
   MOCK_REVIEWS,
+  MOCK_SESSIONS,
+  MOCK_ORDERS,
 } from './mock-data'
 
 // ─── Generic helpers ──────────────────────────────────────────────────────────
@@ -208,6 +210,132 @@ export function recalculateRestaurantRating(restaurantId: string): void {
     rating: Math.round(avg * 10) / 10,
     reviewCount: reviews.length,
   })
+}
+
+// ─── Table Status ────────────────────────────────────────────────────────────
+
+export function getTablesByStatus(restaurantId: string, status: TableStatus): Table[] {
+  return getTablesForRestaurant(restaurantId).filter((t) => t.status === status)
+}
+
+export function updateTableStatus(tableId: string, status: TableStatus): void {
+  const list = getTables()
+  const table = list.find((t) => t.id === tableId)
+  if (table) {
+    table.status = status
+    save(KEY_TABLES, list)
+  }
+}
+
+export function getTableByQrCode(qrCode: string): Table | null {
+  return getTables().find((t) => t.qrCode === qrCode) ?? null
+}
+
+// ─── Table Sessions ──────────────────────────────────────────────────────────
+
+const KEY_SESSIONS = 'df_sessions'
+
+export function getSessions(): TableSession[] {
+  return load<TableSession[]>(KEY_SESSIONS, MOCK_SESSIONS)
+}
+
+export function getActiveSessionForTable(tableId: string): TableSession | null {
+  return getSessions().find((s) => s.tableId === tableId && !s.closedAt) ?? null
+}
+
+export function getSessionsForRestaurant(restaurantId: string): TableSession[] {
+  return getSessions().filter((s) => s.restaurantId === restaurantId)
+}
+
+export function createSession(tableId: string, restaurantId: string): TableSession {
+  const session: TableSession = {
+    id: generateId(),
+    tableId,
+    restaurantId,
+    startedAt: new Date().toISOString(),
+    closedAt: null,
+    totalAmount: 0,
+  }
+  const list = getSessions()
+  list.push(session)
+  save(KEY_SESSIONS, list)
+  updateTableStatus(tableId, 'occupied')
+  return session
+}
+
+export function closeSession(sessionId: string): void {
+  const list = getSessions()
+  const session = list.find((s) => s.id === sessionId)
+  if (session) {
+    session.closedAt = new Date().toISOString()
+    // Calculate total from orders
+    const orders = getOrdersForSession(sessionId)
+    session.totalAmount = orders.reduce(
+      (sum, o) => sum + o.items.reduce((s, i) => s + i.price * i.quantity, 0),
+      0
+    )
+    save(KEY_SESSIONS, list)
+    updateTableStatus(session.tableId, 'free')
+  }
+}
+
+// ─── Orders ──────────────────────────────────────────────────────────────────
+
+const KEY_ORDERS = 'df_orders'
+
+export function getOrders(): Order[] {
+  return load<Order[]>(KEY_ORDERS, MOCK_ORDERS)
+}
+
+export function getOrdersForSession(sessionId: string): Order[] {
+  return getOrders().filter((o) => o.sessionId === sessionId)
+}
+
+export function getOrdersForRestaurant(restaurantId: string): Order[] {
+  return getOrders().filter((o) => o.restaurantId === restaurantId)
+}
+
+export function getPendingOrdersForRestaurant(restaurantId: string): Order[] {
+  return getOrdersForRestaurant(restaurantId).filter(
+    (o) => o.status === 'pending' || o.status === 'preparing'
+  )
+}
+
+export function createOrder(
+  sessionId: string,
+  tableId: string,
+  restaurantId: string,
+  items: Omit<OrderItem, 'id' | 'orderId'>[],
+  notes: string = ''
+): Order {
+  const orderId = generateId()
+  const order: Order = {
+    id: orderId,
+    sessionId,
+    tableId,
+    restaurantId,
+    status: 'pending',
+    notes,
+    createdAt: new Date().toISOString(),
+    items: items.map((item) => ({
+      ...item,
+      id: generateId(),
+      orderId,
+    })),
+  }
+  const list = getOrders()
+  list.push(order)
+  save(KEY_ORDERS, list)
+  return order
+}
+
+export function updateOrderStatus(orderId: string, status: OrderStatus): void {
+  const list = getOrders()
+  const order = list.find((o) => o.id === orderId)
+  if (order) {
+    order.status = status
+    save(KEY_ORDERS, list)
+  }
 }
 
 // ─── Image utilities ─────────────────────────────────────────────────────────

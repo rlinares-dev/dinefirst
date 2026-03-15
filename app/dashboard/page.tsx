@@ -38,7 +38,6 @@ export default function DashboardHomePage() {
       city: 'madrid',
       plan: 'pro',
       capacity: 60,
-      isActive: true,
       rating: 4.7,
       reviewCount: 234,
     } as Restaurant
@@ -129,15 +128,8 @@ export default function DashboardHomePage() {
               <span className="pill-accent text-xs">
                 {restaurant?.plan?.toUpperCase() ?? 'FREE'}
               </span>
-              <span
-                className={clsx(
-                  'pill text-xs',
-                  restaurant?.isActive
-                    ? 'bg-success/10 text-success border border-success/20'
-                    : 'bg-red-400/10 text-red-400 border border-red-400/20'
-                )}
-              >
-                {restaurant?.isActive ? 'Activo' : 'Inactivo'}
+              <span className="pill text-xs bg-success/10 text-success border border-success/20">
+                Activo
               </span>
             </div>
           </div>

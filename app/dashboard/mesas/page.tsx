@@ -3,16 +3,32 @@
 import { useEffect, useState } from 'react'
 import clsx from 'clsx'
 import { getTablesForRestaurant, saveTable, deleteTable, generateId } from '@/lib/data'
-import type { Table } from '@/types/database'
+import type { Table, TableStatus } from '@/types/database'
 
 const LOCATIONS = ['Interior', 'Terraza', 'Privado', 'Barra', 'Jardín', 'Primer piso']
 const CAPACITIES = [1, 2, 3, 4, 5, 6, 8, 10, 12]
 
 const RESTAURANT_ID = 'rest-1'
 
-type FormState = { name: string; capacity: number; location: string; isActive: boolean }
+const STATUS_LABELS: Record<TableStatus, string> = {
+  free: 'Libre',
+  occupied: 'Ocupada',
+  en_route: 'En camino',
+  reserved: 'Reservada',
+  inactive: 'Inactiva',
+}
 
-const EMPTY_FORM: FormState = { name: '', capacity: 4, location: 'Interior', isActive: true }
+const STATUS_COLORS: Record<TableStatus, string> = {
+  free: 'text-foreground-subtle border-border-subtle',
+  occupied: 'text-emerald-400 bg-emerald-400/10 border-emerald-400/20',
+  en_route: 'text-amber-400 bg-amber-400/10 border-amber-400/20',
+  reserved: 'text-blue-400 bg-blue-400/10 border-blue-400/20',
+  inactive: 'text-foreground-subtle/50 border-border-subtle',
+}
+
+type FormState = { name: string; capacity: number; location: string; status: TableStatus }
+
+const EMPTY_FORM: FormState = { name: '', capacity: 4, location: 'Interior', status: 'free' }
 
 export default function DashboardTablesPage() {
   const [tables, setTables] = useState<Table[]>([])
@@ -33,7 +49,7 @@ export default function DashboardTablesPage() {
 
   function openEdit(t: Table) {
     setEditingId(t.id)
-    setForm({ name: t.name, capacity: t.capacity, location: t.location, isActive: t.isActive })
+    setForm({ name: t.name, capacity: t.capacity, location: t.location, status: t.status })
     setShowForm(true)
   }
 
@@ -45,7 +61,10 @@ export default function DashboardTablesPage() {
       name: form.name.trim(),
       capacity: form.capacity,
       location: form.location,
-      isActive: form.isActive,
+      status: form.status,
+      qrCode: editingId
+        ? (tables.find((t) => t.id === editingId)?.qrCode ?? `df-rest1-${generateId()}`)
+        : `df-rest1-${generateId()}`,
     }
     saveTable(table)
     setTables(getTablesForRestaurant(RESTAURANT_ID))
@@ -60,12 +79,11 @@ export default function DashboardTablesPage() {
   }
 
   function toggleActive(t: Table) {
-    saveTable({ ...t, isActive: !t.isActive })
+    saveTable({ ...t, status: t.status === 'inactive' ? 'free' : 'inactive' })
     setTables(getTablesForRestaurant(RESTAURANT_ID))
   }
 
-  const active = tables.filter((t) => t.isActive)
-  const inactive = tables.filter((t) => !t.isActive)
+  const active = tables.filter((t) => t.status !== 'inactive')
   const totalCapacity = active.reduce((s, t) => s + t.capacity, 0)
 
   return (
@@ -84,10 +102,11 @@ export default function DashboardTablesPage() {
       </div>
 
       {/* Stats */}
-      <div className="grid gap-4 sm:grid-cols-3">
+      <div className="grid gap-4 sm:grid-cols-4">
         {[
           { label: 'Total mesas', value: tables.length },
-          { label: 'Mesas activas', value: active.length },
+          { label: 'Libres', value: tables.filter((t) => t.status === 'free').length },
+          { label: 'Ocupadas', value: tables.filter((t) => t.status === 'occupied').length },
           { label: 'Capacidad total', value: totalCapacity + ' pax' },
         ].map((s) => (
           <div key={s.label} className="card">
@@ -144,18 +163,19 @@ export default function DashboardTablesPage() {
                 ))}
               </select>
             </div>
-            <div className="flex items-center gap-3">
-              <label className="relative inline-flex cursor-pointer items-center">
-                <input
-                  type="checkbox"
-                  checked={form.isActive}
-                  onChange={(e) => setForm((f) => ({ ...f, isActive: e.target.checked }))}
-                  className="sr-only"
-                />
-                <div className={clsx('h-5 w-10 rounded-full transition-colors', form.isActive ? 'bg-accent' : 'bg-border-strong')} />
-                <div className={clsx('absolute h-4 w-4 rounded-full bg-white shadow transition-transform', form.isActive ? 'translate-x-5' : 'translate-x-1')} />
+            <div>
+              <label className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-foreground-subtle">
+                Estado
               </label>
-              <span className="text-sm text-foreground-subtle">Mesa activa</span>
+              <select
+                value={form.status}
+                onChange={(e) => setForm((f) => ({ ...f, status: e.target.value as TableStatus }))}
+                className="w-full rounded-md border border-border-subtle bg-background-elevated px-3 py-2 text-sm text-foreground outline-none focus:border-accent"
+              >
+                {(Object.keys(STATUS_LABELS) as TableStatus[]).map((s) => (
+                  <option key={s} value={s}>{STATUS_LABELS[s]}</option>
+                ))}
+              </select>
             </div>
           </div>
           <div className="mt-5 flex gap-3">
@@ -184,7 +204,7 @@ export default function DashboardTablesPage() {
           {tables.map((t) => (
             <div
               key={t.id}
-              className={clsx('card flex flex-col gap-3', !t.isActive && 'opacity-50')}
+              className={clsx('card flex flex-col gap-3', t.status === 'inactive' && 'opacity-50')}
             >
               {/* Confirm delete overlay */}
               {deleteConfirm === t.id && (
@@ -207,8 +227,8 @@ export default function DashboardTablesPage() {
                     <p className="font-semibold text-foreground">{t.name}</p>
                     <p className="text-xs text-foreground-subtle mt-0.5">{t.location}</p>
                   </div>
-                  <span className={clsx('rounded-full border px-2 py-0.5 text-xs', t.isActive ? 'text-success bg-success/10 border-success/20' : 'text-foreground-subtle border-border-subtle')}>
-                    {t.isActive ? 'Activa' : 'Inactiva'}
+                  <span className={clsx('rounded-full border px-2 py-0.5 text-xs', STATUS_COLORS[t.status])}>
+                    {STATUS_LABELS[t.status]}
                   </span>
                 </div>
 
@@ -219,7 +239,11 @@ export default function DashboardTablesPage() {
                   <span className="text-xs text-foreground-subtle">persona{t.capacity !== 1 ? 's' : ''}</span>
                 </div>
 
-                <div className="mt-4 flex gap-2">
+                <div className="mt-3 text-[10px] text-foreground-subtle/50 font-mono">
+                  QR: {t.qrCode}
+                </div>
+
+                <div className="mt-3 flex gap-2">
                   <button
                     onClick={() => openEdit(t)}
                     className="flex-1 rounded-md border border-border-subtle py-1.5 text-xs text-foreground-subtle hover:border-accent hover:text-accent transition"
@@ -230,7 +254,7 @@ export default function DashboardTablesPage() {
                     onClick={() => toggleActive(t)}
                     className="flex-1 rounded-md border border-border-subtle py-1.5 text-xs text-foreground-subtle hover:text-foreground transition"
                   >
-                    {t.isActive ? 'Desactivar' : 'Activar'}
+                    {t.status === 'inactive' ? 'Activar' : 'Desactivar'}
                   </button>
                   <button
                     onClick={() => setDeleteConfirm(t.id)}

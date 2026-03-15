@@ -109,7 +109,7 @@ export default function RestaurantClient({ ciudad, slug }: Props) {
       return
     }
     setRestaurant(rest)
-    const t = getTablesForRestaurant(rest.id).filter((t) => t.isActive)
+    const t = getTablesForRestaurant(rest.id).filter((t) => t.status !== 'inactive')
     setTables(t)
     if (t.length > 0) setSelectedTable(t[0].id)
     setMenuItems(getMenuForRestaurant(rest.id).filter((m) => m.isAvailable))
