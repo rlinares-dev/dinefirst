@@ -13,11 +13,12 @@ import {
 // ─── Generic helpers ──────────────────────────────────────────────────────────
 
 function load<T>(key: string, defaults: T): T {
-  if (typeof window === 'undefined') return defaults
+  if (typeof window === 'undefined') return JSON.parse(JSON.stringify(defaults))
   const raw = localStorage.getItem(key)
   if (!raw) {
-    localStorage.setItem(key, JSON.stringify(defaults))
-    return defaults
+    const json = JSON.stringify(defaults)
+    localStorage.setItem(key, json)
+    return JSON.parse(json) as T
   }
   return JSON.parse(raw) as T
 }
