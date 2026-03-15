@@ -8,6 +8,8 @@ import type { User } from '@/types/database'
 
 const NAV_ITEMS = [
   { href: '/dashboard', label: 'Resumen', icon: '◈' },
+  { href: '/dashboard/tpv', label: 'TPV', icon: '▣' },
+  { href: '/dashboard/comandas', label: 'Comandas', icon: '▤' },
   { href: '/dashboard/mesas', label: 'Mesas', icon: '⊞' },
   { href: '/dashboard/menu', label: 'Menú', icon: '☰' },
   { href: '/dashboard/analiticas', label: 'Analíticas', icon: '◉' },

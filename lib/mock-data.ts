@@ -224,15 +224,15 @@ export const MOCK_ORDERS: Order[] = [
 
 export const MOCK_MENU_ITEMS: MenuItem[] = [
   // La Taberna del Chef
-  { id: 'm1-1', restaurantId: 'rest-1', name: 'Croquetas de jamón ibérico', description: 'Bechamel cremosa, jamón ibérico DO, panko dorado', price: 12, category: 'entrantes', isAvailable: true },
-  { id: 'm1-2', restaurantId: 'rest-1', name: 'Gazpacho de temporada', description: 'Tomates de huerta, pepino, pimiento y aceite virgen extra', price: 9, category: 'entrantes', isAvailable: true },
-  { id: 'm1-3', restaurantId: 'rest-1', name: 'Steak tartar', description: 'Solomillo picado a cuchillo, alcaparras, mostaza Dijon, yema curada', price: 18, category: 'entrantes', isAvailable: true },
-  { id: 'm1-4', restaurantId: 'rest-1', name: 'Cocido madrileño', description: 'Receta tradicional de tres vuelcos, garbanzos de Fuentesaúco', price: 24, category: 'principales', isAvailable: true },
-  { id: 'm1-5', restaurantId: 'rest-1', name: 'Lubina a la sal', description: 'Lubina salvaje, sal marina, aceite de oliva arbequina, limón', price: 28, category: 'principales', isAvailable: true },
-  { id: 'm1-6', restaurantId: 'rest-1', name: 'Entrecot de vaca madurada', description: '400g, maduración 45 días, chimichurri casero, patatas paja', price: 34, category: 'principales', isAvailable: false },
-  { id: 'm1-7', restaurantId: 'rest-1', name: 'Torrija caramelizada', description: 'Pan brioche, crema de vainilla, helado de azafrán', price: 8, category: 'postres', isAvailable: true },
-  { id: 'm1-8', restaurantId: 'rest-1', name: 'Vino de la casa (copa)', description: 'Selección del sumiller, rota cada semana', price: 6, category: 'bebidas', isAvailable: true },
-  { id: 'm1-9', restaurantId: 'rest-1', name: 'Agua mineral', description: 'Botella 1L con o sin gas', price: 3, category: 'bebidas', isAvailable: true },
+  { id: 'm1-1', restaurantId: 'rest-1', name: 'Croquetas de jamón ibérico', description: 'Bechamel cremosa, jamón ibérico DO, panko dorado', price: 12, category: 'entrantes', isAvailable: true, imageUrl: 'https://images.unsplash.com/photo-1554433607-66b5efe9d304?w=400&h=300&fit=crop' },
+  { id: 'm1-2', restaurantId: 'rest-1', name: 'Gazpacho de temporada', description: 'Tomates de huerta, pepino, pimiento y aceite virgen extra', price: 9, category: 'entrantes', isAvailable: true, imageUrl: 'https://images.unsplash.com/photo-1600335895229-6e75511892c8?w=400&h=300&fit=crop' },
+  { id: 'm1-3', restaurantId: 'rest-1', name: 'Steak tartar', description: 'Solomillo picado a cuchillo, alcaparras, mostaza Dijon, yema curada', price: 18, category: 'entrantes', isAvailable: true, imageUrl: 'https://images.unsplash.com/photo-1626200419199-391ae4be7a41?w=400&h=300&fit=crop' },
+  { id: 'm1-4', restaurantId: 'rest-1', name: 'Cocido madrileño', description: 'Receta tradicional de tres vuelcos, garbanzos de Fuentesaúco', price: 24, category: 'principales', isAvailable: true, imageUrl: 'https://images.unsplash.com/photo-1547592166-23ac45744acd?w=400&h=300&fit=crop' },
+  { id: 'm1-5', restaurantId: 'rest-1', name: 'Lubina a la sal', description: 'Lubina salvaje, sal marina, aceite de oliva arbequina, limón', price: 28, category: 'principales', isAvailable: true, imageUrl: 'https://images.unsplash.com/photo-1534604973900-c43ab4c2e0ab?w=400&h=300&fit=crop' },
+  { id: 'm1-6', restaurantId: 'rest-1', name: 'Entrecot de vaca madurada', description: '400g, maduración 45 días, chimichurri casero, patatas paja', price: 34, category: 'principales', isAvailable: false, imageUrl: 'https://images.unsplash.com/photo-1558030006-450675393462?w=400&h=300&fit=crop' },
+  { id: 'm1-7', restaurantId: 'rest-1', name: 'Torrija caramelizada', description: 'Pan brioche, crema de vainilla, helado de azafrán', price: 8, category: 'postres', isAvailable: true, imageUrl: 'https://images.unsplash.com/photo-1551024506-0bccd828d307?w=400&h=300&fit=crop' },
+  { id: 'm1-8', restaurantId: 'rest-1', name: 'Vino de la casa (copa)', description: 'Selección del sumiller, rota cada semana', price: 6, category: 'bebidas', isAvailable: true, imageUrl: 'https://images.unsplash.com/photo-1510812431401-41d2bd2722f3?w=400&h=300&fit=crop' },
+  { id: 'm1-9', restaurantId: 'rest-1', name: 'Agua mineral', description: 'Botella 1L con o sin gas', price: 3, category: 'bebidas', isAvailable: true, imageUrl: 'https://images.unsplash.com/photo-1548839140-29a749e1cf4d?w=400&h=300&fit=crop' },
 
   // El Rincón de la Abuela
   { id: 'm2-1', restaurantId: 'rest-2', name: 'Pa amb tomàquet', description: 'Pan artesano, tomate restregado, aceite virgen extra, sal gruesa', price: 4, category: 'entrantes', isAvailable: true },

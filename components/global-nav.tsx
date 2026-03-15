@@ -2,7 +2,7 @@
 
 import { usePathname } from 'next/navigation'
 
-const HIDDEN_PREFIXES = ['/app', '/dashboard', '/admin']
+const HIDDEN_PREFIXES = ['/app', '/dashboard', '/admin', '/mesa']
 
 export function GlobalNav() {
   const pathname = usePathname()

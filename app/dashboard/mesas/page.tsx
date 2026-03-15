@@ -36,6 +36,7 @@ export default function DashboardTablesPage() {
   const [editingId, setEditingId] = useState<string | null>(null)
   const [form, setForm] = useState<FormState>(EMPTY_FORM)
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null)
+  const [qrModal, setQrModal] = useState<Table | null>(null)
 
   useEffect(() => {
     setTables(getTablesForRestaurant(RESTAURANT_ID))
@@ -239,8 +240,14 @@ export default function DashboardTablesPage() {
                   <span className="text-xs text-foreground-subtle">persona{t.capacity !== 1 ? 's' : ''}</span>
                 </div>
 
-                <div className="mt-3 text-[10px] text-foreground-subtle/50 font-mono">
-                  QR: {t.qrCode}
+                <div className="mt-3 flex items-center justify-between">
+                  <span className="text-[10px] text-foreground-subtle/50 font-mono">QR: {t.qrCode}</span>
+                  <button
+                    onClick={() => setQrModal(t)}
+                    className="text-[10px] text-accent hover:text-accent-strong transition"
+                  >
+                    Ver QR
+                  </button>
                 </div>
 
                 <div className="mt-3 flex gap-2">
@@ -266,6 +273,45 @@ export default function DashboardTablesPage() {
               </div>
             </div>
           ))}
+        </div>
+      )}
+
+      {/* QR Modal */}
+      {qrModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" onClick={() => setQrModal(null)}>
+          <div className="w-full max-w-sm rounded-xl bg-background-elevated border border-border-subtle p-6 text-center" onClick={(e) => e.stopPropagation()}>
+            <h3 className="text-lg font-semibold text-foreground mb-1">{qrModal.name}</h3>
+            <p className="text-xs text-foreground-subtle mb-4">{qrModal.location} · {qrModal.capacity} personas</p>
+
+            <div className="rounded-lg bg-white p-6 mb-4">
+              <div className="mx-auto flex h-32 w-32 items-center justify-center">
+                <div className="text-center">
+                  <p className="text-xs text-gray-500 mb-1">Código QR</p>
+                  <p className="text-sm font-mono font-bold text-gray-900">{qrModal.qrCode}</p>
+                </div>
+              </div>
+            </div>
+
+            <p className="text-xs text-foreground-subtle mb-1">URL del cliente:</p>
+            <p className="text-xs font-mono text-accent break-all mb-4">
+              {typeof window !== 'undefined' ? window.location.origin : ''}/mesa/{qrModal.qrCode}
+            </p>
+
+            <div className="flex gap-2">
+              <button
+                onClick={() => {
+                  const url = `${window.location.origin}/mesa/${qrModal.qrCode}`
+                  navigator.clipboard.writeText(url)
+                }}
+                className="btn-primary flex-1 text-xs"
+              >
+                Copiar URL
+              </button>
+              <button onClick={() => setQrModal(null)} className="btn-secondary flex-1 text-xs">
+                Cerrar
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>
