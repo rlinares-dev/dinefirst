@@ -101,7 +101,10 @@ INSTRUCCIONES:
   if (!response.ok) {
     const errorText = await response.text()
     console.error('OpenRouter error:', response.status, errorText)
-    return new Response(JSON.stringify({ error: 'Error al contactar el servicio AI' }), {
+    const errorMsg = response.status === 402
+      ? 'Sin créditos en OpenRouter. Recarga en openrouter.ai/settings/credits'
+      : 'Error al contactar el servicio AI'
+    return new Response(JSON.stringify({ error: errorMsg }), {
       status: 502,
       headers: { 'Content-Type': 'application/json' },
     })

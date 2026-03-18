@@ -553,7 +553,7 @@ export async function sbAssignWaiterToTable(tableId: string, waiterId: string | 
 
 export async function sbGetRotationState(restaurantId: string): Promise<WaiterRotationState | null> {
   const supabase = createClient()
-  const { data, error } = await supabase.from('waiter_rotation_state').select('*').eq('restaurant_id', restaurantId).single()
+  const { data, error } = await supabase.from('waiter_rotation_state').select('*').eq('restaurant_id', restaurantId).maybeSingle()
   if (error || !data) return null
   return {
     restaurantId: data.restaurant_id,
