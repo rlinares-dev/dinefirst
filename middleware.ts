@@ -31,13 +31,20 @@ export async function middleware(request: NextRequest) {
     }
   }
 
-  // /dashboard/* requiere rol restaurante o admin
+  // /dashboard/* requiere rol restaurante, admin o camarero
   if (pathname.startsWith('/dashboard')) {
     if (!user) {
       return NextResponse.redirect(new URL('/login', request.url))
     }
-    if (userRole && userRole !== 'restaurante' && userRole !== 'admin') {
+    if (userRole && userRole !== 'restaurante' && userRole !== 'admin' && userRole !== 'camarero') {
       return NextResponse.redirect(new URL('/app', request.url))
+    }
+    // Camareros no pueden acceder a rutas restringidas
+    if (userRole === 'camarero') {
+      const restricted = ['/dashboard/analiticas', '/dashboard/facturacion', '/dashboard/perfil', '/dashboard/equipo']
+      if (restricted.some((r) => pathname.startsWith(r))) {
+        return NextResponse.redirect(new URL('/dashboard/tpv', request.url))
+      }
     }
   }
 
@@ -59,6 +66,9 @@ export async function middleware(request: NextRequest) {
       }
       if (userRole === 'restaurante') {
         return NextResponse.redirect(new URL('/dashboard', request.url))
+      }
+      if (userRole === 'camarero') {
+        return NextResponse.redirect(new URL('/dashboard/tpv', request.url))
       }
       return NextResponse.redirect(new URL('/app', request.url))
     }

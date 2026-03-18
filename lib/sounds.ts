@@ -41,3 +41,9 @@ export function playOrderSound() {
 export function playNotificationSound() {
   playTone(660, 0.25, 'triangle')
 }
+
+/** Ding-dong for bill requests — lower, more distinctive */
+export function playBillSound() {
+  playTone(523, 0.2, 'sine') // C5
+  setTimeout(() => playTone(392, 0.3, 'sine'), 250) // G4 — descending "ding-dong"
+}

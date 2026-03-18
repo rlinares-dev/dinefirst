@@ -1,12 +1,23 @@
 'use client'
 
 import { useState, useCallback } from 'react'
+import { useRouter } from 'next/navigation'
 import clsx from 'clsx'
 import {
   getOrdersForRestaurant,
   getTablesForRestaurant,
+  getSessionsForRestaurant,
   updateOrderStatus,
 } from '@/lib/data'
+import { isSupabaseConfigured } from '@/lib/env'
+import {
+  sbGetOrdersForRestaurant,
+  sbGetTablesForRestaurant,
+  sbGetSessionsForRestaurant,
+  sbUpdateOrderStatus,
+} from '@/lib/supabase-data'
+import { useRestaurant } from '@/lib/hooks/use-restaurant'
+import { useAuth } from '@/components/providers/auth-provider'
 import type { Order, OrderStatus } from '@/types/database'
 import { usePolling } from '@/lib/hooks/use-polling'
 import { useBroadcast } from '@/lib/hooks/use-broadcast'
@@ -14,40 +25,83 @@ import { playOrderSound } from '@/lib/sounds'
 import ComandaCard from '@/components/comandas/comanda-card'
 import { PageTransition } from '@/components/ui/page-transition'
 import { StaggeredGrid } from '@/components/ui/staggered-list'
-
-const RESTAURANT_ID = 'rest-1'
+import { BillAlertOverlay, useBillAlerts } from '@/components/ui/bill-alert'
 
 type FilterType = 'active' | 'pending' | 'preparing' | 'all'
 
 export default function ComandasPage() {
+  const router = useRouter()
+  const { user } = useAuth()
+  const { restaurantId } = useRestaurant()
   const [orders, setOrders] = useState<Order[]>([])
   const [tableNames, setTableNames] = useState<Record<string, string>>({})
+  const [tableWaiterMap, setTableWaiterMap] = useState<Record<string, string | undefined>>({})
   const [filter, setFilter] = useState<FilterType>('active')
   const [prevPendingCount, setPrevPendingCount] = useState(0)
+  const { alerts, showBillAlert, dismissAlert } = useBillAlerts()
+  const isCamarero = user?.role === 'camarero'
 
   const { broadcast } = useBroadcast<string>(() => refreshData())
 
-  const refreshData = useCallback(() => {
-    const allOrders = getOrdersForRestaurant(RESTAURANT_ID)
-      .sort((a, b) => a.createdAt.localeCompare(b.createdAt))
-    setOrders(allOrders)
+  const refreshData = useCallback(async () => {
+    if (!restaurantId) return
 
-    const tables = getTablesForRestaurant(RESTAURANT_ID)
+    const sb = isSupabaseConfigured()
+    const tables = sb
+      ? await sbGetTablesForRestaurant(restaurantId)
+      : getTablesForRestaurant(restaurantId)
     const names: Record<string, string> = {}
-    tables.forEach((t) => { names[t.id] = t.name })
+    const twMap: Record<string, string | undefined> = {}
+    tables.forEach((t) => { names[t.id] = t.name; twMap[t.id] = t.assignedWaiterId })
     setTableNames(names)
+    setTableWaiterMap(twMap)
+
+    // Get my table IDs if camarero
+    const myTableIds = isCamarero && user?.id
+      ? new Set(tables.filter((t) => t.assignedWaiterId === user.id).map((t) => t.id))
+      : null
+
+    let allOrders = (sb
+      ? await sbGetOrdersForRestaurant(restaurantId)
+      : getOrdersForRestaurant(restaurantId)
+    ).sort((a, b) => a.createdAt.localeCompare(b.createdAt))
+
+    // Filter orders to only my tables if camarero
+    if (myTableIds) {
+      allOrders = allOrders.filter((o) => myTableIds.has(o.tableId))
+    }
+    setOrders(allOrders)
 
     const pendingCount = allOrders.filter((o) => o.status === 'pending').length
     setPrevPendingCount((prev) => {
       if (pendingCount > prev && prev > 0) playOrderSound()
       return pendingCount
     })
-  }, [])
+
+    // Detect bill requests from active sessions
+    const sessions = sb
+      ? await sbGetSessionsForRestaurant(restaurantId)
+      : getSessionsForRestaurant(restaurantId)
+    for (const s of sessions) {
+      if (!s.closedAt && s.billRequested) {
+        showBillAlert({
+          tableName: names[s.tableId] ?? 'Mesa ?',
+          tableId: s.tableId,
+          total: s.totalAmount ?? 0,
+          requestedAt: new Date().toISOString(),
+        })
+      }
+    }
+  }, [restaurantId])
 
   usePolling(refreshData, 3000)
 
-  function handleStatusChange(orderId: string, newStatus: OrderStatus) {
-    updateOrderStatus(orderId, newStatus)
+  async function handleStatusChange(orderId: string, newStatus: OrderStatus) {
+    if (isSupabaseConfigured()) {
+      await sbUpdateOrderStatus(orderId, newStatus)
+    } else {
+      updateOrderStatus(orderId, newStatus)
+    }
     broadcast('order-update')
     refreshData()
   }
@@ -72,6 +126,13 @@ export default function ComandasPage() {
 
   return (
     <PageTransition className="space-y-6">
+      {/* Bill request alerts overlay */}
+      <BillAlertOverlay
+        alerts={alerts}
+        onDismiss={dismissAlert}
+        onNavigate={(tableId) => router.push(`/dashboard/tpv/${tableId}`)}
+      />
+
       {/* Header */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>

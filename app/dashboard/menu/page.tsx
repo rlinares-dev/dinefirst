@@ -2,10 +2,11 @@
 
 import { useEffect, useState } from 'react'
 import clsx from 'clsx'
-import { getMenuForRestaurant, saveMenuItem, deleteMenuItem, generateId, compressImage } from '@/lib/data'
+import { getMenuForRestaurant, saveMenuItem, deleteMenuItem, generateId, compressImage, getRestaurantForCurrentUser } from '@/lib/data'
+import { isSupabaseConfigured } from '@/lib/env'
+import { sbGetMenuForRestaurant, sbSaveMenuItem, sbDeleteMenuItem, sbGetRestaurantForCurrentUser } from '@/lib/supabase-data'
+import { useAuth } from '@/components/providers/auth-provider'
 import type { MenuItem, MenuCategory } from '@/types/database'
-
-const RESTAURANT_ID = 'rest-1'
 
 const CATEGORIES: { id: MenuCategory; label: string; icon: string }[] = [
   { id: 'entrantes', label: 'Entrantes', icon: '🥗' },
@@ -18,6 +19,8 @@ type FormState = { name: string; description: string; price: string; category: M
 const EMPTY_FORM: FormState = { name: '', description: '', price: '', category: 'entrantes', isAvailable: true, imageUrl: '' }
 
 export default function DashboardMenuPage() {
+  const { user } = useAuth()
+  const [restaurantId, setRestaurantId] = useState<string>('')
   const [items, setItems] = useState<MenuItem[]>([])
   const [activeCategory, setActiveCategory] = useState<MenuCategory | 'all'>('all')
   const [showForm, setShowForm] = useState(false)
@@ -28,8 +31,22 @@ export default function DashboardMenuPage() {
   const [imageUploading, setImageUploading] = useState(false)
 
   useEffect(() => {
-    setItems(getMenuForRestaurant(RESTAURANT_ID))
-  }, [])
+    if (!user) return
+    async function loadData() {
+      if (isSupabaseConfigured()) {
+        const rest = await sbGetRestaurantForCurrentUser()
+        if (!rest) return
+        setRestaurantId(rest.id)
+        setItems(await sbGetMenuForRestaurant(rest.id))
+      } else {
+        const rest = getRestaurantForCurrentUser()
+        const id = rest?.id ?? 'rest-1'
+        setRestaurantId(id)
+        setItems(getMenuForRestaurant(id))
+      }
+    }
+    loadData()
+  }, [user])
 
   const filtered = items.filter((item) => {
     const matchCat = activeCategory === 'all' || item.category === activeCategory
@@ -49,12 +66,12 @@ export default function DashboardMenuPage() {
     setShowForm(true)
   }
 
-  function handleSave() {
+  async function handleSave() {
     const price = parseFloat(form.price)
-    if (!form.name.trim() || isNaN(price) || price <= 0) return
+    if (!form.name.trim() || isNaN(price) || price <= 0 || !restaurantId) return
     const item: MenuItem = {
       id: editingId ?? generateId(),
-      restaurantId: RESTAURANT_ID,
+      restaurantId,
       name: form.name.trim(),
       description: form.description.trim(),
       price,
@@ -62,21 +79,37 @@ export default function DashboardMenuPage() {
       isAvailable: form.isAvailable,
       ...(form.imageUrl ? { imageUrl: form.imageUrl } : {}),
     }
-    saveMenuItem(item)
-    setItems(getMenuForRestaurant(RESTAURANT_ID))
+    if (isSupabaseConfigured()) {
+      await sbSaveMenuItem(item)
+      setItems(await sbGetMenuForRestaurant(restaurantId))
+    } else {
+      saveMenuItem(item)
+      setItems(getMenuForRestaurant(restaurantId))
+    }
     setShowForm(false)
     setEditingId(null)
   }
 
-  function handleDelete(id: string) {
-    deleteMenuItem(id)
-    setItems(getMenuForRestaurant(RESTAURANT_ID))
+  async function handleDelete(id: string) {
+    if (isSupabaseConfigured()) {
+      await sbDeleteMenuItem(id)
+      setItems(await sbGetMenuForRestaurant(restaurantId))
+    } else {
+      deleteMenuItem(id)
+      setItems(getMenuForRestaurant(restaurantId))
+    }
     setDeleteConfirm(null)
   }
 
-  function toggleAvailable(item: MenuItem) {
-    saveMenuItem({ ...item, isAvailable: !item.isAvailable })
-    setItems(getMenuForRestaurant(RESTAURANT_ID))
+  async function toggleAvailable(item: MenuItem) {
+    const toggled = { ...item, isAvailable: !item.isAvailable }
+    if (isSupabaseConfigured()) {
+      await sbSaveMenuItem(toggled)
+      setItems(await sbGetMenuForRestaurant(restaurantId))
+    } else {
+      saveMenuItem(toggled)
+      setItems(getMenuForRestaurant(restaurantId))
+    }
   }
 
   async function handleImageUpload(e: React.ChangeEvent<HTMLInputElement>) {
@@ -280,8 +313,12 @@ export default function DashboardMenuPage() {
                         </div>
                       ) : (
                         <>
-                          {item.imageUrl && (
-                            <img src={item.imageUrl} alt={item.name} className="h-12 w-12 rounded-lg object-cover shrink-0" />
+                          {item.imageUrl ? (
+                            <img src={item.imageUrl} alt={item.name} className="h-16 w-16 rounded-xl object-cover shrink-0" />
+                          ) : (
+                            <div className="h-16 w-16 rounded-xl shrink-0 flex items-center justify-center bg-background-elevated border border-border-subtle">
+                              <span className="text-xl text-foreground-subtle/30">🍽️</span>
+                            </div>
                           )}
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2">
@@ -290,6 +327,9 @@ export default function DashboardMenuPage() {
                             </div>
                             {item.description && (
                               <p className="mt-0.5 text-xs text-foreground-subtle truncate">{item.description}</p>
+                            )}
+                            {!item.imageUrl && (
+                              <p className="mt-0.5 text-[10px] text-foreground-subtle/40">Sin foto · Editar para añadir</p>
                             )}
                           </div>
                           <div className="flex items-center gap-3 shrink-0">

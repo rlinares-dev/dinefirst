@@ -14,31 +14,38 @@ export interface Database {
       profiles: {
         Row: {
           id: string
-          role: 'comensal' | 'restaurante' | 'admin'
+          role: 'comensal' | 'restaurante' | 'admin' | 'camarero'
           name: string
           email: string
           phone: string | null
           avatar_url: string | null
+          username: string | null
+          restaurant_id: string | null
           created_at: string
         }
         Insert: {
           id: string
-          role?: 'comensal' | 'restaurante' | 'admin'
+          role?: 'comensal' | 'restaurante' | 'admin' | 'camarero'
           name?: string
           email?: string
           phone?: string | null
           avatar_url?: string | null
+          username?: string | null
+          restaurant_id?: string | null
           created_at?: string
         }
         Update: {
           id?: string
-          role?: 'comensal' | 'restaurante' | 'admin'
+          role?: 'comensal' | 'restaurante' | 'admin' | 'camarero'
           name?: string
           email?: string
           phone?: string | null
           avatar_url?: string | null
+          username?: string | null
+          restaurant_id?: string | null
           created_at?: string
         }
+        Relationships: []
       }
       restaurants: {
         Row: {
@@ -98,6 +105,7 @@ export interface Database {
           images?: string[]
           created_at?: string
         }
+        Relationships: []
       }
       tables: {
         Row: {
@@ -105,25 +113,32 @@ export interface Database {
           restaurant_id: string
           name: string
           capacity: number
-          is_active: boolean
           location: string | null
+          status: 'free' | 'occupied' | 'en_route' | 'reserved' | 'inactive'
+          qr_code: string | null
+          assigned_waiter_id: string | null
         }
         Insert: {
           id?: string
           restaurant_id: string
           name: string
           capacity?: number
-          is_active?: boolean
           location?: string | null
+          status?: 'free' | 'occupied' | 'en_route' | 'reserved' | 'inactive'
+          qr_code?: string | null
+          assigned_waiter_id?: string | null
         }
         Update: {
           id?: string
           restaurant_id?: string
           name?: string
           capacity?: number
-          is_active?: boolean
           location?: string | null
+          status?: 'free' | 'occupied' | 'en_route' | 'reserved' | 'inactive'
+          qr_code?: string | null
+          assigned_waiter_id?: string | null
         }
+        Relationships: []
       }
       menu_items: {
         Row: {
@@ -156,6 +171,7 @@ export interface Database {
           is_available?: boolean
           image_url?: string | null
         }
+        Relationships: []
       }
       reservations: {
         Row: {
@@ -218,6 +234,7 @@ export interface Database {
           whatsapp_consent?: boolean
           created_at?: string
         }
+        Relationships: []
       }
       reviews: {
         Row: {
@@ -247,10 +264,174 @@ export interface Database {
           comment?: string | null
           created_at?: string
         }
+        Relationships: []
+      }
+      table_sessions: {
+        Row: {
+          id: string
+          table_id: string
+          restaurant_id: string
+          started_at: string
+          closed_at: string | null
+          total_amount: number
+          bill_requested: boolean
+          bill_requested_at: string | null
+          waiter_id: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          table_id: string
+          restaurant_id: string
+          started_at?: string
+          closed_at?: string | null
+          total_amount?: number
+          bill_requested?: boolean
+          bill_requested_at?: string | null
+          waiter_id?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          table_id?: string
+          restaurant_id?: string
+          started_at?: string
+          closed_at?: string | null
+          total_amount?: number
+          bill_requested?: boolean
+          bill_requested_at?: string | null
+          waiter_id?: string | null
+          created_at?: string
+        }
+        Relationships: []
+      }
+      orders: {
+        Row: {
+          id: string
+          session_id: string
+          table_id: string
+          restaurant_id: string
+          status: 'pending' | 'preparing' | 'served' | 'paid' | 'cancelled'
+          notes: string | null
+          waiter_id: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          session_id: string
+          table_id: string
+          restaurant_id: string
+          status?: 'pending' | 'preparing' | 'served' | 'paid' | 'cancelled'
+          notes?: string | null
+          waiter_id?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          session_id?: string
+          table_id?: string
+          restaurant_id?: string
+          status?: 'pending' | 'preparing' | 'served' | 'paid' | 'cancelled'
+          notes?: string | null
+          waiter_id?: string | null
+          created_at?: string
+        }
+        Relationships: []
+      }
+      waiter_rotation_state: {
+        Row: {
+          restaurant_id: string
+          last_rotation_date: string
+          last_extra_waiter_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          restaurant_id: string
+          last_rotation_date?: string
+          last_extra_waiter_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          restaurant_id?: string
+          last_rotation_date?: string
+          last_extra_waiter_id?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      order_items: {
+        Row: {
+          id: string
+          order_id: string
+          menu_item_id: string
+          name: string
+          price: number
+          quantity: number
+          notes: string | null
+        }
+        Insert: {
+          id?: string
+          order_id: string
+          menu_item_id: string
+          name: string
+          price: number
+          quantity?: number
+          notes?: string | null
+        }
+        Update: {
+          id?: string
+          order_id?: string
+          menu_item_id?: string
+          name?: string
+          price?: number
+          quantity?: number
+          notes?: string | null
+        }
+        Relationships: []
+      }
+      push_subscriptions: {
+        Row: {
+          id: string
+          user_id: string
+          restaurant_id: string
+          endpoint: string
+          p256dh: string
+          auth: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          restaurant_id: string
+          endpoint: string
+          p256dh: string
+          auth: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          restaurant_id?: string
+          endpoint?: string
+          p256dh?: string
+          auth?: string
+          created_at?: string
+        }
+        Relationships: []
       }
     }
-    Functions: Record<string, never>
-    Enums: Record<string, never>
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      [_ in never]: never
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
   }
 }
 

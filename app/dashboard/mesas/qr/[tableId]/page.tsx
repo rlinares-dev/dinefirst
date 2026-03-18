@@ -3,6 +3,8 @@
 import { useEffect, useState, useRef } from 'react'
 import { useParams } from 'next/navigation'
 import { getTablesForRestaurant, getRestaurantById } from '@/lib/data'
+import { isSupabaseConfigured } from '@/lib/env'
+import { sbGetTableById, sbGetRestaurantById } from '@/lib/supabase-data'
 import type { Table, Restaurant } from '@/types/database'
 
 /**
@@ -70,13 +72,25 @@ export default function QRPrintPage() {
   const [restaurant, setRestaurant] = useState<Restaurant | null>(null)
 
   useEffect(() => {
-    const tables = getTablesForRestaurant('rest-1')
-    const t = tables.find((tb) => tb.id === tableId)
-    if (t) {
-      setTable(t)
-      const r = getRestaurantById(t.restaurantId)
-      if (r) setRestaurant(r)
+    async function load() {
+      if (isSupabaseConfigured()) {
+        const t = await sbGetTableById(tableId)
+        if (t) {
+          setTable(t)
+          const r = await sbGetRestaurantById(t.restaurantId)
+          if (r) setRestaurant(r)
+        }
+      } else {
+        const tables = getTablesForRestaurant('rest-1')
+        const t = tables.find((tb) => tb.id === tableId)
+        if (t) {
+          setTable(t)
+          const r = getRestaurantById(t.restaurantId)
+          if (r) setRestaurant(r)
+        }
+      }
     }
+    load()
   }, [tableId])
 
   useEffect(() => {

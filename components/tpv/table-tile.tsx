@@ -23,19 +23,32 @@ interface TableTileProps {
   table: Table
   pendingOrders?: number
   sessionDuration?: string
+  billRequested?: boolean
+  waiterName?: string
   onOccupy?: () => void
   onFree?: () => void
   onClick?: () => void
 }
 
-export default function TableTile({ table, pendingOrders = 0, sessionDuration, onOccupy, onFree, onClick }: TableTileProps) {
+export default function TableTile({ table, pendingOrders = 0, sessionDuration, billRequested, waiterName, onOccupy, onFree, onClick }: TableTileProps) {
   return (
     <div
       onClick={onClick}
-      className={clsx('card relative flex flex-col gap-3 cursor-pointer', table.status === 'inactive' && 'opacity-50')}
+      className={clsx(
+        'card relative flex flex-col gap-3 cursor-pointer',
+        table.status === 'inactive' && 'opacity-50',
+        billRequested && 'bill-requested'
+      )}
     >
+      {/* Bill requested badge */}
+      {billRequested && (
+        <span className="absolute -left-1.5 -top-1.5 z-10 flex items-center gap-1 rounded-full bg-accent px-2 py-0.5 text-[10px] font-bold text-white shadow-lg shadow-accent/30 animate-pulse">
+          🧾 CUENTA
+        </span>
+      )}
+
       {/* Pending orders badge */}
-      {pendingOrders > 0 && (
+      {pendingOrders > 0 && !billRequested && (
         <span className="absolute -right-1.5 -top-1.5 flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white">
           {pendingOrders}
         </span>
@@ -45,6 +58,9 @@ export default function TableTile({ table, pendingOrders = 0, sessionDuration, o
         <div>
           <p className="font-semibold text-foreground">{table.name}</p>
           <p className="text-xs text-foreground-subtle mt-0.5">{table.location}</p>
+          {waiterName && (
+            <p className="text-[10px] text-accent/70 mt-0.5">◇ {waiterName}</p>
+          )}
         </div>
         <span className={clsx('rounded-full border px-2 py-0.5 text-xs', STATUS_COLORS[table.status])}>
           {STATUS_LABELS[table.status]}

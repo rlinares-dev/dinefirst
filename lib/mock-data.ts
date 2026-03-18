@@ -33,6 +33,26 @@ export const MOCK_USERS: User[] = [
     phone: '+34 600 555 666',
     createdAt: '2026-02-10T00:00:00Z',
   },
+  {
+    id: 'user-cam-1',
+    name: 'Elena Ruiz',
+    email: '',
+    username: 'elena',
+    role: 'camarero',
+    phone: '+34 600 777 888',
+    createdAt: '2026-03-01T00:00:00Z',
+    restaurantId: 'rest-1',
+  },
+  {
+    id: 'user-cam-2',
+    name: 'Diego Torres',
+    email: '',
+    username: 'diego',
+    role: 'camarero',
+    phone: '+34 600 999 000',
+    createdAt: '2026-03-05T00:00:00Z',
+    restaurantId: 'rest-1',
+  },
 ]
 
 export const MOCK_RESTAURANTS: Restaurant[] = [
@@ -220,6 +240,70 @@ export const MOCK_ORDERS: Order[] = [
       { id: 'oi-10', orderId: 'ord-5', menuItemId: 'm3-7', name: 'Sake Junmai Daiginjo (copa)', price: 12, quantity: 1, notes: '' },
     ],
   },
+  // ─── Órdenes históricas rest-1 (para analytics) ─────────────────────────────
+  {
+    id: 'ord-h1', sessionId: 'sess-h1', tableId: 't1-2', restaurantId: 'rest-1', status: 'paid', notes: '', createdAt: '2026-03-14T14:10:00Z',
+    items: [
+      { id: 'oi-h1', orderId: 'ord-h1', menuItemId: 'm1-1', name: 'Croquetas de jamón ibérico', price: 12, quantity: 2, notes: '' },
+      { id: 'oi-h2', orderId: 'ord-h1', menuItemId: 'm1-4', name: 'Cocido madrileño', price: 24, quantity: 2, notes: '' },
+      { id: 'oi-h3', orderId: 'ord-h1', menuItemId: 'm1-8', name: 'Vino de la casa (copa)', price: 6, quantity: 3, notes: '' },
+    ],
+  },
+  {
+    id: 'ord-h2', sessionId: 'sess-h2', tableId: 't1-6', restaurantId: 'rest-1', status: 'paid', notes: '', createdAt: '2026-03-14T21:20:00Z',
+    items: [
+      { id: 'oi-h4', orderId: 'ord-h2', menuItemId: 'm1-3', name: 'Steak tartar', price: 18, quantity: 1, notes: '' },
+      { id: 'oi-h5', orderId: 'ord-h2', menuItemId: 'm1-5', name: 'Lubina a la sal', price: 28, quantity: 1, notes: '' },
+      { id: 'oi-h6', orderId: 'ord-h2', menuItemId: 'm1-7', name: 'Torrija caramelizada', price: 8, quantity: 2, notes: '' },
+    ],
+  },
+  {
+    id: 'ord-h3', sessionId: 'sess-h3', tableId: 't1-1', restaurantId: 'rest-1', status: 'paid', notes: '', createdAt: '2026-03-13T13:45:00Z',
+    items: [
+      { id: 'oi-h7', orderId: 'ord-h3', menuItemId: 'm1-2', name: 'Gazpacho de temporada', price: 9, quantity: 2, notes: '' },
+      { id: 'oi-h8', orderId: 'ord-h3', menuItemId: 'm1-4', name: 'Cocido madrileño', price: 24, quantity: 1, notes: '' },
+      { id: 'oi-h9', orderId: 'ord-h3', menuItemId: 'm1-9', name: 'Agua mineral', price: 3, quantity: 2, notes: '' },
+    ],
+  },
+  {
+    id: 'ord-h4', sessionId: 'sess-h4', tableId: 't1-3', restaurantId: 'rest-1', status: 'paid', notes: '', createdAt: '2026-03-12T21:00:00Z',
+    items: [
+      { id: 'oi-h10', orderId: 'ord-h4', menuItemId: 'm1-1', name: 'Croquetas de jamón ibérico', price: 12, quantity: 1, notes: '' },
+      { id: 'oi-h11', orderId: 'ord-h4', menuItemId: 'm1-5', name: 'Lubina a la sal', price: 28, quantity: 2, notes: '' },
+      { id: 'oi-h12', orderId: 'ord-h4', menuItemId: 'm1-8', name: 'Vino de la casa (copa)', price: 6, quantity: 4, notes: '' },
+    ],
+  },
+  {
+    id: 'ord-h5', sessionId: 'sess-h5', tableId: 't1-2', restaurantId: 'rest-1', status: 'paid', notes: '', createdAt: '2026-03-11T14:30:00Z',
+    items: [
+      { id: 'oi-h13', orderId: 'ord-h5', menuItemId: 'm1-3', name: 'Steak tartar', price: 18, quantity: 2, notes: '' },
+      { id: 'oi-h14', orderId: 'ord-h5', menuItemId: 'm1-7', name: 'Torrija caramelizada', price: 8, quantity: 1, notes: '' },
+    ],
+  },
+  {
+    id: 'ord-h6', sessionId: 'sess-h6', tableId: 't1-6', restaurantId: 'rest-1', status: 'paid', notes: '', createdAt: '2026-03-10T20:45:00Z',
+    items: [
+      { id: 'oi-h15', orderId: 'ord-h6', menuItemId: 'm1-4', name: 'Cocido madrileño', price: 24, quantity: 3, notes: '' },
+      { id: 'oi-h16', orderId: 'ord-h6', menuItemId: 'm1-2', name: 'Gazpacho de temporada', price: 9, quantity: 3, notes: '' },
+      { id: 'oi-h17', orderId: 'ord-h6', menuItemId: 'm1-9', name: 'Agua mineral', price: 3, quantity: 3, notes: '' },
+    ],
+  },
+  {
+    id: 'ord-h7', sessionId: 'sess-h7', tableId: 't1-1', restaurantId: 'rest-1', status: 'paid', notes: '', createdAt: '2026-03-09T13:15:00Z',
+    items: [
+      { id: 'oi-h18', orderId: 'ord-h7', menuItemId: 'm1-1', name: 'Croquetas de jamón ibérico', price: 12, quantity: 3, notes: '' },
+      { id: 'oi-h19', orderId: 'ord-h7', menuItemId: 'm1-5', name: 'Lubina a la sal', price: 28, quantity: 1, notes: '' },
+    ],
+  },
+  {
+    id: 'ord-h8', sessionId: 'sess-h8', tableId: 't1-4', restaurantId: 'rest-1', status: 'paid', notes: '', createdAt: '2026-03-08T21:30:00Z',
+    items: [
+      { id: 'oi-h20', orderId: 'ord-h8', menuItemId: 'm1-3', name: 'Steak tartar', price: 18, quantity: 1, notes: '' },
+      { id: 'oi-h21', orderId: 'ord-h8', menuItemId: 'm1-4', name: 'Cocido madrileño', price: 24, quantity: 1, notes: '' },
+      { id: 'oi-h22', orderId: 'ord-h8', menuItemId: 'm1-7', name: 'Torrija caramelizada', price: 8, quantity: 3, notes: '' },
+      { id: 'oi-h23', orderId: 'ord-h8', menuItemId: 'm1-8', name: 'Vino de la casa (copa)', price: 6, quantity: 2, notes: '' },
+    ],
+  },
 ]
 
 export const MOCK_MENU_ITEMS: MenuItem[] = [
@@ -353,10 +437,10 @@ export const MOCK_RESERVATIONS: Reservation[] = [
 
 export const MOCK_REVIEWS: Review[] = [
   // La Taberna del Chef (rest-1) — rating ~4.7
-  { id: 'rev-1', restaurantId: 'rest-1', userId: 'user-com-1', userName: 'María García', rating: 5, comment: 'Las croquetas de jamón ibérico son las mejores que he probado en Madrid. Ambiente íntimo y servicio impecable. Volveremos seguro.', createdAt: '2026-03-01T12:00:00Z' },
-  { id: 'rev-2', restaurantId: 'rest-1', userId: 'user-com-2', userName: 'Javier López', rating: 5, comment: 'El cocido madrileño de tres vuelcos es espectacular. Productos de primera calidad y una presentación muy cuidada.', createdAt: '2026-02-25T19:00:00Z' },
+  { id: 'rev-1', restaurantId: 'rest-1', userId: 'user-com-1', userName: 'María García', rating: 5, comment: 'Las croquetas de jamón ibérico son las mejores que he probado en Madrid. Ambiente íntimo y servicio impecable. Volveremos seguro.', createdAt: '2026-03-01T12:00:00Z', response: 'Muchas gracias María! Nos alegra que disfrutaras de las croquetas, son nuestro orgullo. Te esperamos pronto!', respondedAt: '2026-03-02T10:00:00Z' },
+  { id: 'rev-2', restaurantId: 'rest-1', userId: 'user-com-2', userName: 'Javier López', rating: 5, comment: 'El cocido madrileño de tres vuelcos es espectacular. Productos de primera calidad y una presentación muy cuidada.', createdAt: '2026-02-25T19:00:00Z', response: 'Gracias Javier! El cocido es nuestro plato estrella. Usamos garbanzos de Fuentesaúco y productos de temporada.', respondedAt: '2026-02-26T11:00:00Z' },
   { id: 'rev-3', restaurantId: 'rest-1', userId: 'user-com-3', userName: 'Laura Martínez', rating: 4, comment: 'Muy buena cocina aunque la espera fue algo larga. La torrija caramelizada es un pecado delicioso.', createdAt: '2026-02-18T21:30:00Z' },
-  { id: 'rev-4', restaurantId: 'rest-1', userId: 'user-com-4', userName: 'Pablo Ruiz', rating: 4, comment: 'Gran relación calidad-precio para el nivel de cocina que ofrecen. El steak tartar, perfecto.', createdAt: '2026-02-10T14:00:00Z' },
+  { id: 'rev-4', restaurantId: 'rest-1', userId: 'user-com-4', userName: 'Pablo Ruiz', rating: 4, comment: 'Gran relación calidad-precio para el nivel de cocina que ofrecen. El steak tartar, perfecto.', createdAt: '2026-02-10T14:00:00Z', response: 'Apreciamos tu comentario Pablo. El steak tartar lo preparamos con solomillo cortado a cuchillo al momento!', respondedAt: '2026-02-12T09:00:00Z' },
   // El Rincón de la Abuela (rest-2) — rating ~4.9
   { id: 'rev-5', restaurantId: 'rest-2', userId: 'user-com-1', userName: 'María García', rating: 5, comment: 'La crema catalana de la abuela es legendaria. Cuatro generaciones de saber hacer se notan en cada plato.', createdAt: '2026-03-05T13:00:00Z' },
   { id: 'rev-6', restaurantId: 'rest-2', userId: 'user-com-2', userName: 'Javier López', rating: 5, comment: 'Fideuà de gambas increíble. El patio interior es un oasis en Barcelona. Reservad con antelación.', createdAt: '2026-02-28T20:00:00Z' },

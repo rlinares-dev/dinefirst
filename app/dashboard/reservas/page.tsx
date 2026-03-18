@@ -3,9 +3,10 @@
 import { useEffect, useState } from 'react'
 import clsx from 'clsx'
 import { getReservationsForRestaurant, updateReservationStatus } from '@/lib/data'
+import { isSupabaseConfigured } from '@/lib/env'
+import { sbGetReservationsForRestaurant, sbUpdateReservationStatus } from '@/lib/supabase-data'
+import { useRestaurant } from '@/lib/hooks/use-restaurant'
 import type { Reservation, ReservationStatus } from '@/types/database'
-
-const RESTAURANT_ID = 'rest-1'
 
 const STATUS_LABEL: Record<ReservationStatus, string> = {
   pending: 'Pendiente',
@@ -22,17 +23,30 @@ const STATUS_COLOR: Record<ReservationStatus, string> = {
 }
 
 export default function DashboardReservationsPage() {
+  const { restaurantId } = useRestaurant()
   const [reservations, setReservations] = useState<Reservation[]>([])
   const [filter, setFilter] = useState<ReservationStatus | 'all'>('all')
   const [dateFilter, setDateFilter] = useState('')
 
   useEffect(() => {
-    setReservations(getReservationsForRestaurant(RESTAURANT_ID))
+    if (!restaurantId) return
+    async function load() {
+      if (isSupabaseConfigured()) {
+        setReservations(await sbGetReservationsForRestaurant(restaurantId))
+      } else {
+        setReservations(getReservationsForRestaurant(restaurantId))
+      }
+    }
+    load()
     setDateFilter(new Date().toISOString().slice(0, 10))
-  }, [])
+  }, [restaurantId])
 
-  function changeStatus(id: string, status: ReservationStatus) {
-    updateReservationStatus(id, status)
+  async function changeStatus(id: string, status: ReservationStatus) {
+    if (isSupabaseConfigured()) {
+      await sbUpdateReservationStatus(id, status)
+    } else {
+      updateReservationStatus(id, status)
+    }
     setReservations((prev) => prev.map((r) => (r.id === id ? { ...r, status } : r)))
   }
 

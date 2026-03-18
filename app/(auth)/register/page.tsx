@@ -33,7 +33,7 @@ export default function RegisterPage() {
     setLoading(true)
     setError('')
 
-    const signUpRole = role === 'admin' ? 'comensal' : role
+    const signUpRole: 'comensal' | 'restaurante' = (role === 'admin' || role === 'camarero') ? 'comensal' : role
     const result = await signUp({ email, password, name, role: signUpRole, phone })
 
     if (result.error) {

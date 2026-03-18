@@ -10,7 +10,21 @@ import {
   createSession,
   createOrder,
   getOrdersForSession,
+  requestBill,
+  getSessionById,
 } from '@/lib/data'
+import { isSupabaseConfigured } from '@/lib/env'
+import {
+  sbGetTableByQrCode,
+  sbGetRestaurantById,
+  sbGetMenuForRestaurant,
+  sbGetActiveSessionForTable,
+  sbCreateSession,
+  sbCreateOrder,
+  sbGetOrdersForSession,
+  sbRequestBill,
+  sbGetSessionById,
+} from '@/lib/supabase-data'
 import type { Table, Restaurant, MenuItem, Order } from '@/types/database'
 import MenuSection from '@/components/mesa/menu-section'
 import CartDrawer from '@/components/mesa/cart-drawer'
@@ -40,52 +54,72 @@ export default function MesaClientPage() {
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
+  const [billRequested, setBillRequested] = useState(false)
+  const [sessionClosed, setSessionClosed] = useState(false)
 
   // Initial load
   useEffect(() => {
-    const t = getTableByQrCode(code)
-    if (!t) {
-      setError('Mesa no encontrada. Verifica el código QR.')
+    async function init() {
+      const sb = isSupabaseConfigured()
+
+      const t = sb ? await sbGetTableByQrCode(code) : getTableByQrCode(code)
+      if (!t) {
+        setError('Mesa no encontrada. Verifica el código QR.')
+        setLoading(false)
+        return
+      }
+      setTable(t)
+
+      const r = sb ? await sbGetRestaurantById(t.restaurantId) : getRestaurantById(t.restaurantId)
+      if (!r) {
+        setError('Restaurante no encontrado.')
+        setLoading(false)
+        return
+      }
+      setRestaurant(r)
+
+      const items = sb ? await sbGetMenuForRestaurant(t.restaurantId) : getMenuForRestaurant(t.restaurantId)
+      setMenu(items)
+
+      // Find or create session
+      let session = sb ? await sbGetActiveSessionForTable(t.id) : getActiveSessionForTable(t.id)
+      if (!session) {
+        session = sb ? await sbCreateSession(t.id, t.restaurantId) : createSession(t.id, t.restaurantId)
+      }
+      setSessionId(session.id)
+      setBillRequested(session.billRequested ?? false)
+
+      // Load existing orders
+      const existingOrders = sb ? await sbGetOrdersForSession(session.id) : getOrdersForSession(session.id)
+      setOrders(existingOrders)
+      if (existingOrders.length > 0) {
+        setView('orders')
+      }
+
       setLoading(false)
-      return
     }
-    setTable(t)
-
-    const r = getRestaurantById(t.restaurantId)
-    if (!r) {
-      setError('Restaurante no encontrado.')
-      setLoading(false)
-      return
-    }
-    setRestaurant(r)
-
-    const items = getMenuForRestaurant(t.restaurantId)
-    setMenu(items)
-
-    // Find or create session
-    let session = getActiveSessionForTable(t.id)
-    if (!session) {
-      session = createSession(t.id, t.restaurantId)
-    }
-    setSessionId(session.id)
-
-    // Load existing orders
-    const existingOrders = getOrdersForSession(session.id)
-    setOrders(existingOrders)
-    if (existingOrders.length > 0) {
-      setView('orders')
-    }
-
-    setLoading(false)
+    init()
   }, [code])
 
-  // Poll for order status updates
-  const refreshOrders = useCallback(() => {
+  // Poll for order status updates + bill state
+  const refreshOrders = useCallback(async () => {
     if (!sessionId) return
-    setOrders(getOrdersForSession(sessionId))
+    const sb = isSupabaseConfigured()
+
+    // Refresh session state (bill requested, closed)
+    const session = sb ? await sbGetSessionById(sessionId) : getSessionById(sessionId)
+    if (session) {
+      setBillRequested(session.billRequested ?? false)
+      if (session.closedAt) {
+        setSessionClosed(true)
+      }
+    }
+
+    const freshOrders = sb ? await sbGetOrdersForSession(sessionId) : getOrdersForSession(sessionId)
+    setOrders(freshOrders)
   }, [sessionId])
 
-  usePolling(refreshOrders, 5000, view === 'orders' && !!sessionId)
+  usePolling(refreshOrders, 5000, !!sessionId)
 
   function addToCart(item: MenuItem) {
     setCart((prev) => {
@@ -138,11 +172,61 @@ export default function MesaClientPage() {
       notes: ci.notes,
     }))
 
-    createOrder(sessionId, table.id, restaurant.id, items, generalNotes)
+    const sb = isSupabaseConfigured()
+    if (sb) {
+      await sbCreateOrder(sessionId, table.id, restaurant.id, items, generalNotes)
+      const freshOrders = await sbGetOrdersForSession(sessionId)
+      setOrders(freshOrders)
+
+      // Trigger push notification to waiter/owner
+      fetch('/api/push/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          restaurantId: restaurant.id,
+          tableId: table.id,
+          tableName: table.name,
+          type: 'new_order',
+          waiterId: table.assignedWaiterId,
+        }),
+      }).catch(() => { /* push is best-effort */ })
+    } else {
+      createOrder(sessionId, table.id, restaurant.id, items, generalNotes)
+      setOrders(getOrdersForSession(sessionId))
+    }
+
     setCart({})
-    setOrders(getOrdersForSession(sessionId))
     setView('orders')
     setSubmitting(false)
+  }
+
+  async function handleRequestBill() {
+    if (!sessionId || !table || !restaurant) return
+    const sb = isSupabaseConfigured()
+    if (sb) {
+      await sbRequestBill(sessionId)
+
+      // Trigger push notification for bill request
+      const totalAmount = orders.reduce(
+        (sum, o) => sum + o.items.reduce((s, i) => s + i.price * i.quantity, 0), 0
+      )
+      fetch('/api/push/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          restaurantId: restaurant.id,
+          tableId: table.id,
+          tableName: table.name,
+          type: 'bill_requested',
+          total: totalAmount,
+          waiterId: table.assignedWaiterId,
+        }),
+      }).catch(() => { /* push is best-effort */ })
+    } else {
+      requestBill(sessionId)
+    }
+    setBillRequested(true)
+    setView('orders')
   }
 
   // Loading
@@ -186,14 +270,16 @@ export default function MesaClientPage() {
             <p className="text-xs text-foreground-subtle">{table?.name} · {table?.location}</p>
           </div>
           <div className="flex gap-2">
-            <button
-              onClick={() => setView('menu')}
-              className={view === 'menu'
-                ? 'rounded-full bg-accent/10 px-3 py-1 text-xs font-medium text-accent border border-accent/30'
-                : 'rounded-full border border-border-subtle px-3 py-1 text-xs text-foreground-subtle'}
-            >
-              Carta
-            </button>
+            {!billRequested && !sessionClosed && (
+              <button
+                onClick={() => setView('menu')}
+                className={view === 'menu'
+                  ? 'rounded-full bg-accent/10 px-3 py-1 text-xs font-medium text-accent border border-accent/30'
+                  : 'rounded-full border border-border-subtle px-3 py-1 text-xs text-foreground-subtle'}
+              >
+                Carta
+              </button>
+            )}
             {orders.length > 0 && (
               <button
                 onClick={() => setView('orders')}
@@ -201,7 +287,7 @@ export default function MesaClientPage() {
                   ? 'rounded-full bg-accent/10 px-3 py-1 text-xs font-medium text-accent border border-accent/30'
                   : 'rounded-full border border-border-subtle px-3 py-1 text-xs text-foreground-subtle'}
               >
-                Pedidos ({orders.length})
+                {billRequested ? '🧾 Cuenta' : `Pedidos (${orders.length})`}
               </button>
             )}
           </div>
@@ -210,10 +296,10 @@ export default function MesaClientPage() {
 
       {/* Content */}
       <div className="p-4">
-        {view === 'menu' ? (
+        {view === 'menu' && !billRequested && !sessionClosed ? (
           <div className="space-y-6">
             {CATEGORIES.map((cat) => {
-              const items = menu.filter((m) => m.category === cat)
+              const items = menu.filter((m) => m.category === cat && m.isAvailable)
               return (
                 <MenuSection
                   key={cat}
@@ -236,12 +322,15 @@ export default function MesaClientPage() {
           <OrderStatusView
             orders={orders}
             onOrderMore={() => setView('menu')}
+            onRequestBill={handleRequestBill}
+            billRequested={billRequested}
+            sessionClosed={sessionClosed}
           />
         )}
       </div>
 
-      {/* Cart drawer (only on menu view) */}
-      {view === 'menu' && (
+      {/* Cart drawer (only on menu view, not if bill requested) */}
+      {view === 'menu' && !billRequested && !sessionClosed && (
         <CartDrawer
           items={cartItems}
           onUpdateNotes={updateItemNotes}

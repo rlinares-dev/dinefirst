@@ -2,13 +2,14 @@
 
 import { useEffect, useState } from 'react'
 import clsx from 'clsx'
-import { getTablesForRestaurant, saveTable, deleteTable, generateId } from '@/lib/data'
+import { getTablesForRestaurant, saveTable, deleteTable, generateId, getRestaurantForCurrentUser } from '@/lib/data'
+import { isSupabaseConfigured } from '@/lib/env'
+import { sbGetTablesForRestaurant, sbSaveTable, sbDeleteTable, sbGetRestaurantForCurrentUser } from '@/lib/supabase-data'
+import { useAuth } from '@/components/providers/auth-provider'
 import type { Table, TableStatus } from '@/types/database'
 
 const LOCATIONS = ['Interior', 'Terraza', 'Privado', 'Barra', 'Jardín', 'Primer piso']
 const CAPACITIES = [1, 2, 3, 4, 5, 6, 8, 10, 12]
-
-const RESTAURANT_ID = 'rest-1'
 
 const STATUS_LABELS: Record<TableStatus, string> = {
   free: 'Libre',
@@ -31,6 +32,8 @@ type FormState = { name: string; capacity: number; location: string; status: Tab
 const EMPTY_FORM: FormState = { name: '', capacity: 4, location: 'Interior', status: 'free' }
 
 export default function DashboardTablesPage() {
+  const { user } = useAuth()
+  const [restaurantId, setRestaurantId] = useState<string>('')
   const [tables, setTables] = useState<Table[]>([])
   const [showForm, setShowForm] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -39,8 +42,22 @@ export default function DashboardTablesPage() {
   const [qrModal, setQrModal] = useState<Table | null>(null)
 
   useEffect(() => {
-    setTables(getTablesForRestaurant(RESTAURANT_ID))
-  }, [])
+    if (!user) return
+    async function loadData() {
+      if (isSupabaseConfigured()) {
+        const rest = await sbGetRestaurantForCurrentUser()
+        if (!rest) return
+        setRestaurantId(rest.id)
+        setTables(await sbGetTablesForRestaurant(rest.id))
+      } else {
+        const rest = getRestaurantForCurrentUser()
+        const id = rest?.id ?? 'rest-1'
+        setRestaurantId(id)
+        setTables(getTablesForRestaurant(id))
+      }
+    }
+    loadData()
+  }, [user])
 
   function openNew() {
     setEditingId(null)
@@ -54,34 +71,50 @@ export default function DashboardTablesPage() {
     setShowForm(true)
   }
 
-  function handleSave() {
-    if (!form.name.trim()) return
+  async function handleSave() {
+    if (!form.name.trim() || !restaurantId) return
     const table: Table = {
       id: editingId ?? generateId(),
-      restaurantId: RESTAURANT_ID,
+      restaurantId,
       name: form.name.trim(),
       capacity: form.capacity,
       location: form.location,
       status: form.status,
       qrCode: editingId
-        ? (tables.find((t) => t.id === editingId)?.qrCode ?? `df-rest1-${generateId()}`)
-        : `df-rest1-${generateId()}`,
+        ? (tables.find((t) => t.id === editingId)?.qrCode ?? `df-${restaurantId}-${generateId()}`)
+        : `df-${restaurantId}-${generateId()}`,
     }
-    saveTable(table)
-    setTables(getTablesForRestaurant(RESTAURANT_ID))
+    if (isSupabaseConfigured()) {
+      await sbSaveTable(table)
+      setTables(await sbGetTablesForRestaurant(restaurantId))
+    } else {
+      saveTable(table)
+      setTables(getTablesForRestaurant(restaurantId))
+    }
     setShowForm(false)
     setEditingId(null)
   }
 
-  function handleDelete(id: string) {
-    deleteTable(id)
-    setTables(getTablesForRestaurant(RESTAURANT_ID))
+  async function handleDelete(id: string) {
+    if (isSupabaseConfigured()) {
+      await sbDeleteTable(id)
+      setTables(await sbGetTablesForRestaurant(restaurantId))
+    } else {
+      deleteTable(id)
+      setTables(getTablesForRestaurant(restaurantId))
+    }
     setDeleteConfirm(null)
   }
 
-  function toggleActive(t: Table) {
-    saveTable({ ...t, status: t.status === 'inactive' ? 'free' : 'inactive' })
-    setTables(getTablesForRestaurant(RESTAURANT_ID))
+  async function toggleActive(t: Table) {
+    const toggled = { ...t, status: t.status === 'inactive' ? 'free' as TableStatus : 'inactive' as TableStatus }
+    if (isSupabaseConfigured()) {
+      await sbSaveTable(toggled)
+      setTables(await sbGetTablesForRestaurant(restaurantId))
+    } else {
+      saveTable(toggled)
+      setTables(getTablesForRestaurant(restaurantId))
+    }
   }
 
   const active = tables.filter((t) => t.status !== 'inactive')

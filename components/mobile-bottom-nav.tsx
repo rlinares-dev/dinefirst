@@ -1,6 +1,7 @@
 'use client'
 
 import { usePathname } from 'next/navigation'
+import { motion } from 'framer-motion'
 import clsx from 'clsx'
 
 const NAV_ITEMS = [
@@ -17,7 +18,12 @@ export function MobileBottomNav() {
   if (!pathname.startsWith('/app')) return null
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-50 border-t border-white/[0.06] bg-background/95 backdrop-blur-sm lg:hidden">
+    <motion.nav
+      initial={{ y: 80, opacity: 0 }}
+      animate={{ y: 0, opacity: 1 }}
+      transition={{ duration: 0.4, delay: 0.2, ease: [0.25, 0.46, 0.45, 0.94] }}
+      className="fixed bottom-0 left-0 right-0 z-50 border-t border-white/[0.06] bg-background/95 backdrop-blur-sm lg:hidden"
+    >
       <div className="mx-auto flex max-w-lg items-stretch justify-around">
         {NAV_ITEMS.map((item) => {
           const active = pathname === item.match || (item.match === '/app' && pathname === '/app')
@@ -32,10 +38,20 @@ export function MobileBottomNav() {
                   : 'text-foreground-subtle hover:text-foreground'
               )}
             >
-              <span className="text-lg leading-none">{item.icon}</span>
+              <motion.span
+                className="text-lg leading-none"
+                whileTap={{ scale: 0.85 }}
+                transition={{ type: 'spring', stiffness: 400, damping: 20 }}
+              >
+                {item.icon}
+              </motion.span>
               <span>{item.label}</span>
               {active && (
-                <span className="mt-0.5 h-0.5 w-4 rounded-full bg-accent" />
+                <motion.span
+                  layoutId="bottom-nav-indicator"
+                  className="mt-0.5 h-0.5 w-4 rounded-full bg-accent"
+                  transition={{ type: 'spring', stiffness: 400, damping: 30 }}
+                />
               )}
             </a>
           )
@@ -43,6 +59,6 @@ export function MobileBottomNav() {
       </div>
       {/* Safe area for iPhone notch */}
       <div className="h-[env(safe-area-inset-bottom)]" />
-    </nav>
+    </motion.nav>
   )
 }

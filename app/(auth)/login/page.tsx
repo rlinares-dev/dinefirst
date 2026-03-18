@@ -1,22 +1,45 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useAuth } from '@/components/providers/auth-provider'
 import { isSupabaseConfigured } from '@/lib/env'
+import { getRestaurantSlugs } from '@/lib/data'
+import { sbGetRestaurantSlugs } from '@/lib/supabase-data'
+
+type LoginMode = 'email' | 'camarero'
 
 export default function LoginPage() {
-  const { signIn, signInWithGoogle } = useAuth()
+  const { signIn, signInCamarero, signInWithGoogle } = useAuth()
+  const [mode, setMode] = useState<LoginMode>('email')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [username, setUsername] = useState('')
+  const [restaurantSlug, setRestaurantSlug] = useState('')
+  const [slugs, setSlugs] = useState<string[]>([])
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+
+  useEffect(() => {
+    async function loadSlugs() {
+      const s = isSupabaseConfigured() ? await sbGetRestaurantSlugs() : getRestaurantSlugs()
+      setSlugs(s)
+      if (s.length > 0) setRestaurantSlug(s[0])
+    }
+    loadSlugs()
+  }, [])
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setError('')
     setLoading(true)
 
-    const result = await signIn(email, password)
+    let result: { error: string | null }
+
+    if (mode === 'camarero') {
+      result = await signInCamarero(username, password, restaurantSlug)
+    } else {
+      result = await signIn(email, password)
+    }
 
     if (result.error) {
       setError(result.error)
@@ -24,14 +47,28 @@ export default function LoginPage() {
       return
     }
 
-    // Redirigir según rol — el AuthProvider ya actualizó el user
-    // Usamos un pequeño delay para que el state se propague
+    if (isSupabaseConfigured()) {
+      // In Supabase mode, fetch profile to determine redirect
+      const { createClient } = await import('@/lib/supabase/client')
+      const supabase = createClient()
+      const { data: { user: authUser } } = await supabase.auth.getUser()
+      if (authUser) {
+        const { data: profile } = await supabase.from('profiles').select('role').eq('id', authUser.id).single()
+        const role = profile?.role ?? 'comensal'
+        if (role === 'admin') window.location.href = '/admin'
+        else if (role === 'restaurante') window.location.href = '/dashboard'
+        else if (role === 'camarero') window.location.href = '/dashboard/tpv'
+        else window.location.href = '/app'
+        return
+      }
+    }
+
     setTimeout(() => {
-      // La redirección la manejamos leyendo el user actualizado
       const { getUser } = require('@/lib/data')
-      const user = getUser()
-      if (user?.role === 'admin') window.location.href = '/admin'
-      else if (user?.role === 'restaurante') window.location.href = '/dashboard'
+      const u = getUser()
+      if (u?.role === 'admin') window.location.href = '/admin'
+      else if (u?.role === 'restaurante') window.location.href = '/dashboard'
+      else if (u?.role === 'camarero') window.location.href = '/dashboard/tpv'
       else window.location.href = '/app'
     }, 100)
   }
@@ -75,41 +112,113 @@ export default function LoginPage() {
 
               <div className="flex items-center gap-3 mb-4">
                 <div className="flex-1 h-px bg-white/[0.08]" />
-                <span className="text-xs text-foreground-subtle">o con email</span>
+                <span className="text-xs text-foreground-subtle">o con credenciales</span>
                 <div className="flex-1 h-px bg-white/[0.08]" />
               </div>
             </>
           )}
 
+          {/* Login mode tabs */}
+          <div className="flex mb-6 rounded-lg border border-border-subtle overflow-hidden">
+            <button
+              type="button"
+              onClick={() => { setMode('email'); setError('') }}
+              className={`flex-1 py-2 text-xs font-medium transition ${
+                mode === 'email'
+                  ? 'bg-accent text-white'
+                  : 'bg-background-elevated text-foreground-subtle hover:text-foreground'
+              }`}
+            >
+              Propietario / Comensal
+            </button>
+            <button
+              type="button"
+              onClick={() => { setMode('camarero'); setError('') }}
+              className={`flex-1 py-2 text-xs font-medium transition ${
+                mode === 'camarero'
+                  ? 'bg-accent text-white'
+                  : 'bg-background-elevated text-foreground-subtle hover:text-foreground'
+              }`}
+            >
+              Camarero
+            </button>
+          </div>
+
           {/* Demo accounts info */}
           <div className="mb-6 rounded-xl border border-accent/20 bg-accent/[0.06] px-4 py-3 text-xs">
             <p className="font-semibold text-foreground mb-1.5">
-              Cuentas de demo disponibles:
+              Cuentas de demo:
             </p>
-            <p className="text-foreground-subtle leading-relaxed">
-              🍽️ comensal@demo.com · password123
-            </p>
-            <p className="text-foreground-subtle leading-relaxed">
-              🏠 restaurante@demo.com · password123
-            </p>
-            <p className="text-foreground-subtle leading-relaxed">
-              ⚙️ admin@dinefirst.com · password123
-            </p>
+            {mode === 'email' ? (
+              <>
+                <p className="text-foreground-subtle leading-relaxed">
+                  🍽️ comensal@demo.com · password123
+                </p>
+                <p className="text-foreground-subtle leading-relaxed">
+                  🏠 restaurante@demo.com · password123
+                </p>
+                <p className="text-foreground-subtle leading-relaxed">
+                  ⚙️ admin@dinefirst.com · password123
+                </p>
+              </>
+            ) : (
+              <>
+                <p className="text-foreground-subtle leading-relaxed">
+                  👨‍🍳 Restaurante: <span className="text-foreground">la-taberna-del-chef</span>
+                </p>
+                <p className="text-foreground-subtle leading-relaxed">
+                  &nbsp;&nbsp;&nbsp;&nbsp;Usuario: <span className="text-foreground">elena</span> · password123
+                </p>
+                <p className="text-foreground-subtle leading-relaxed">
+                  &nbsp;&nbsp;&nbsp;&nbsp;Usuario: <span className="text-foreground">diego</span> · password123
+                </p>
+              </>
+            )}
           </div>
 
           {/* Form */}
           <form onSubmit={handleSubmit} className="space-y-4">
-            <div>
-              <label className="field-label">Email</label>
-              <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="tu@restaurante.com"
-                required
-                className="input w-full"
-              />
-            </div>
+            {mode === 'email' ? (
+              <div>
+                <label className="field-label">Email</label>
+                <input
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="tu@restaurante.com"
+                  required
+                  className="input w-full"
+                />
+              </div>
+            ) : (
+              <>
+                <div>
+                  <label className="field-label">Restaurante</label>
+                  <select
+                    value={restaurantSlug}
+                    onChange={(e) => setRestaurantSlug(e.target.value)}
+                    required
+                    className="input w-full"
+                  >
+                    {slugs.map((s) => (
+                      <option key={s} value={s}>{s}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="field-label">Usuario</label>
+                  <input
+                    type="text"
+                    value={username}
+                    onChange={(e) => setUsername(e.target.value)}
+                    placeholder="nombre de usuario"
+                    required
+                    autoComplete="username"
+                    className="input w-full"
+                  />
+                </div>
+              </>
+            )}
 
             <div>
               <label className="field-label">Contraseña</label>
@@ -138,15 +247,23 @@ export default function LoginPage() {
             </button>
           </form>
 
-          <p className="mt-5 text-center text-xs text-foreground-subtle">
-            ¿No tienes cuenta?{' '}
-            <a
-              href="/register"
-              className="font-medium text-accent hover:text-accent-soft"
-            >
-              Regístrate gratis
-            </a>
-          </p>
+          {mode === 'email' && (
+            <p className="mt-5 text-center text-xs text-foreground-subtle">
+              ¿No tienes cuenta?{' '}
+              <a
+                href="/register"
+                className="font-medium text-accent hover:text-accent-soft"
+              >
+                Regístrate gratis
+              </a>
+            </p>
+          )}
+
+          {mode === 'camarero' && (
+            <p className="mt-5 text-center text-xs text-foreground-subtle">
+              Tu usuario y contraseña los proporciona el propietario del restaurante.
+            </p>
+          )}
         </div>
       </div>
     </main>

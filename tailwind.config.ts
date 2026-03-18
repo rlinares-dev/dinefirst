@@ -70,11 +70,56 @@ const config: Config = {
           '0%': { opacity: '0', transform: 'translateY(-8px)' },
           '100%': { opacity: '1', transform: 'translateY(0)' },
         },
+        shimmer: {
+          '0%': { backgroundPosition: '-200% 0' },
+          '100%': { backgroundPosition: '200% 0' },
+        },
+        float: {
+          '0%, 100%': { transform: 'translateY(0)' },
+          '50%': { transform: 'translateY(-6px)' },
+        },
+        'pulse-glow': {
+          '0%, 100%': { boxShadow: '0 0 12px rgba(249,115,22,0.15)' },
+          '50%': { boxShadow: '0 0 24px rgba(249,115,22,0.35)' },
+        },
+        'scale-in': {
+          '0%': { opacity: '0', transform: 'scale(0.92)' },
+          '100%': { opacity: '1', transform: 'scale(1)' },
+        },
+        'blur-in': {
+          '0%': { opacity: '0', filter: 'blur(8px)' },
+          '100%': { opacity: '1', filter: 'blur(0)' },
+        },
+        'slide-in-right': {
+          '0%': { opacity: '0', transform: 'translateX(20px)' },
+          '100%': { opacity: '1', transform: 'translateX(0)' },
+        },
+        'slide-in-left': {
+          '0%': { opacity: '0', transform: 'translateX(-20px)' },
+          '100%': { opacity: '1', transform: 'translateX(0)' },
+        },
+        'gradient-shift': {
+          '0%, 100%': { backgroundPosition: '0% 50%' },
+          '50%': { backgroundPosition: '100% 50%' },
+        },
+        'bounce-subtle': {
+          '0%, 100%': { transform: 'translateY(0)' },
+          '50%': { transform: 'translateY(-3px)' },
+        },
       },
       animation: {
         'fade-in': 'fadeIn 0.4s ease forwards',
         'slide-up': 'slideUp 0.4s ease forwards',
         'slide-down': 'slideDown 0.3s ease forwards',
+        'shimmer': 'shimmer 2.5s ease-in-out infinite',
+        'float': 'float 3s ease-in-out infinite',
+        'pulse-glow': 'pulse-glow 2s ease-in-out infinite',
+        'scale-in': 'scale-in 0.4s cubic-bezier(0.25,0.46,0.45,0.94) forwards',
+        'blur-in': 'blur-in 0.5s ease forwards',
+        'slide-in-right': 'slide-in-right 0.4s ease forwards',
+        'slide-in-left': 'slide-in-left 0.4s ease forwards',
+        'gradient-shift': 'gradient-shift 4s ease infinite',
+        'bounce-subtle': 'bounce-subtle 2s ease-in-out infinite',
       },
     },
   },

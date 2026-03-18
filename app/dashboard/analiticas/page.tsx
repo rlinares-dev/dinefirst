@@ -2,10 +2,11 @@
 
 import { useEffect, useState } from 'react'
 import clsx from 'clsx'
-import { getReservationsForRestaurant } from '@/lib/data'
-import type { Reservation } from '@/types/database'
-
-const RESTAURANT_ID = 'rest-1'
+import { getReservationsForRestaurant, getOrdersForRestaurant } from '@/lib/data'
+import { isSupabaseConfigured } from '@/lib/env'
+import { sbGetReservationsForRestaurant, sbGetOrdersForRestaurant } from '@/lib/supabase-data'
+import { useRestaurant } from '@/lib/hooks/use-restaurant'
+import type { Reservation, Order } from '@/types/database'
 
 const DAYS = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom']
 
@@ -41,12 +42,24 @@ function HourBar({ hour, count, max }: { hour: string; count: number; max: numbe
 }
 
 export default function DashboardAnalyticsPage() {
+  const { restaurantId } = useRestaurant()
   const [reservations, setReservations] = useState<Reservation[]>([])
+  const [orders, setOrders] = useState<Order[]>([])
   const [period, setPeriod] = useState<'7d' | '30d' | '90d'>('30d')
 
   useEffect(() => {
-    setReservations(getReservationsForRestaurant(RESTAURANT_ID))
-  }, [])
+    if (!restaurantId) return
+    async function load() {
+      if (isSupabaseConfigured()) {
+        setReservations(await sbGetReservationsForRestaurant(restaurantId))
+        setOrders(await sbGetOrdersForRestaurant(restaurantId))
+      } else {
+        setReservations(getReservationsForRestaurant(restaurantId))
+        setOrders(getOrdersForRestaurant(restaurantId))
+      }
+    }
+    load()
+  }, [restaurantId])
 
   // Summary metrics
   const total = reservations.length
@@ -86,11 +99,46 @@ export default function DashboardAnalyticsPage() {
     { label: 'Otros', value: 10, color: 'bg-foreground-subtle' },
   ]
 
+  // TPV metrics
+  const completedOrders = orders.filter((o) => o.status === 'served' || o.status === 'paid')
+  const orderTotal = (o: Order) => o.items.reduce((s, i) => s + i.price * i.quantity, 0)
+  const totalRevenue = completedOrders.reduce((s, o) => s + orderTotal(o), 0)
+  const avgTicket = completedOrders.length === 0 ? 0 : totalRevenue / completedOrders.length
+
+  // Popular dishes (aggregate items across all orders)
+  const dishMap = new Map<string, { name: string; qty: number; revenue: number }>()
+  orders.forEach((o) =>
+    o.items.forEach((item) => {
+      const existing = dishMap.get(item.menuItemId)
+      if (existing) {
+        existing.qty += item.quantity
+        existing.revenue += item.quantity * item.price
+      } else {
+        dishMap.set(item.menuItemId, { name: item.name, qty: item.quantity, revenue: item.quantity * item.price })
+      }
+    }),
+  )
+  const topDishes = [...dishMap.values()].sort((a, b) => b.qty - a.qty).slice(0, 5)
+  const maxDishQty = Math.max(...topDishes.map((d) => d.qty), 1)
+
+  // Revenue per day
+  const revenueByDay = new Map<string, number>()
+  completedOrders.forEach((o) => {
+    const day = o.createdAt.slice(0, 10)
+    revenueByDay.set(day, (revenueByDay.get(day) ?? 0) + orderTotal(o))
+  })
+  const revenueDays = [...revenueByDay.entries()]
+    .sort((a, b) => a[0].localeCompare(b[0]))
+    .slice(-7)
+  const maxDayRevenue = Math.max(...revenueDays.map((d) => d[1]), 1)
+
   const kpis = [
     { label: 'Total reservas', value: total, sub: period, color: 'text-accent' },
     { label: 'Confirmadas', value: `${confirmedRate}%`, sub: `${confirmed} reservas`, color: 'text-success' },
     { label: 'Canceladas', value: `${cancelRate}%`, sub: `${cancelled} reservas`, color: 'text-red-400' },
-    { label: 'Pax promedio', value: avgPartySize, sub: 'por reserva', color: 'text-accent-soft' },
+    { label: 'Ingresos totales', value: `${totalRevenue.toFixed(0)}€`, sub: `${completedOrders.length} pedidos`, color: 'text-accent' },
+    { label: 'Ticket medio', value: `${avgTicket.toFixed(1)}€`, sub: 'por pedido', color: 'text-accent-soft' },
+    { label: 'Pax promedio', value: avgPartySize, sub: 'por reserva', color: 'text-foreground' },
   ]
 
   return (
@@ -115,7 +163,7 @@ export default function DashboardAnalyticsPage() {
       </div>
 
       {/* KPIs */}
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
         {kpis.map((k) => (
           <div key={k.label} className="card">
             <p className="text-xs text-foreground-subtle">{k.label}</p>
@@ -170,6 +218,64 @@ export default function DashboardAnalyticsPage() {
             <StatBar label="Canceladas" value={cancelled} max={total} color="bg-red-400" />
             <StatBar label="No-show" value={noShow} max={total} color="bg-foreground-subtle" />
           </div>
+        </div>
+      </div>
+
+      {/* TPV: Top dishes + Revenue per day */}
+      <div className="grid gap-6 lg:grid-cols-2">
+        {/* Popular dishes */}
+        <div className="card">
+          <h2 className="mb-5 text-base font-semibold text-foreground">Platos más vendidos</h2>
+          {topDishes.length === 0 ? (
+            <p className="text-sm text-foreground-subtle">No hay datos de pedidos aún.</p>
+          ) : (
+            <div className="space-y-3">
+              {topDishes.map((dish, i) => (
+                <div key={dish.name} className="space-y-1">
+                  <div className="flex justify-between text-xs">
+                    <span className="text-foreground">
+                      <span className="text-foreground-subtle mr-1">{i + 1}.</span>
+                      {dish.name}
+                    </span>
+                    <span className="font-medium text-foreground">{dish.qty} uds · {dish.revenue.toFixed(0)}€</span>
+                  </div>
+                  <div className="h-2 rounded-full bg-border-subtle">
+                    <div
+                      className="h-2 rounded-full bg-accent transition-all duration-700"
+                      style={{ width: `${(dish.qty / maxDishQty) * 100}%` }}
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Revenue per day */}
+        <div className="card">
+          <h2 className="mb-5 text-base font-semibold text-foreground">Ingresos por día</h2>
+          {revenueDays.length === 0 ? (
+            <p className="text-sm text-foreground-subtle">No hay datos de pedidos aún.</p>
+          ) : (
+            <div className="flex items-end justify-between gap-2">
+              {revenueDays.map(([day, revenue]) => {
+                const pct = (revenue / maxDayRevenue) * 100
+                const shortDay = new Date(day + 'T12:00:00').toLocaleDateString('es-ES', { weekday: 'short' })
+                return (
+                  <div key={day} className="flex flex-1 flex-col items-center gap-1">
+                    <span className="text-xs font-medium text-foreground">{revenue.toFixed(0)}€</span>
+                    <div className="relative w-full rounded bg-border-subtle" style={{ height: '100px' }}>
+                      <div
+                        className="absolute bottom-0 w-full rounded bg-success/70 transition-all duration-700"
+                        style={{ height: `${pct}%` }}
+                      />
+                    </div>
+                    <span className="text-xs text-foreground-subtle capitalize">{shortDay}</span>
+                  </div>
+                )
+              })}
+            </div>
+          )}
         </div>
       </div>
 

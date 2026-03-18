@@ -11,6 +11,16 @@ import {
   closeSession,
   updateTableStatus,
 } from '@/lib/data'
+import { isSupabaseConfigured } from '@/lib/env'
+import {
+  sbGetTablesForRestaurant,
+  sbGetActiveSessionForTable,
+  sbGetOrdersForSession,
+  sbUpdateOrderStatus,
+  sbCloseSession,
+  sbUpdateTableStatus,
+} from '@/lib/supabase-data'
+import { useRestaurant } from '@/lib/hooks/use-restaurant'
 import type { Table, Order, OrderStatus } from '@/types/database'
 import { usePolling } from '@/lib/hooks/use-polling'
 import { playOrderSound } from '@/lib/sounds'
@@ -56,6 +66,7 @@ function formatDuration(startedAt: string): string {
 export default function SessionDetailPage() {
   const params = useParams<{ tableId: string }>()
   const tableId = params.tableId
+  const { restaurantId } = useRestaurant()
 
   const [table, setTable] = useState<Table | null>(null)
   const [orders, setOrders] = useState<Order[]>([])
@@ -63,18 +74,31 @@ export default function SessionDetailPage() {
   const [sessionStart, setSessionStart] = useState<string | null>(null)
   const [prevOrderCount, setPrevOrderCount] = useState(0)
   const [expandedOrder, setExpandedOrder] = useState<string | null>(null)
+  const [billRequested, setBillRequested] = useState(false)
+  const [billRequestedAt, setBillRequestedAt] = useState<string | null>(null)
 
-  const refreshData = useCallback(() => {
-    const tables = getTablesForRestaurant('rest-1')
+  const refreshData = useCallback(async () => {
+    if (!restaurantId) return
+
+    const sb = isSupabaseConfigured()
+    const tables = sb
+      ? await sbGetTablesForRestaurant(restaurantId)
+      : getTablesForRestaurant(restaurantId)
     const t = tables.find((tb) => tb.id === tableId)
     if (t) setTable(t)
 
-    const session = getActiveSessionForTable(tableId)
+    const session = sb
+      ? await sbGetActiveSessionForTable(tableId)
+      : getActiveSessionForTable(tableId)
     if (session) {
       setSessionId(session.id)
       setSessionStart(session.startedAt)
-      const sessionOrders = getOrdersForSession(session.id)
-        .sort((a, b) => a.createdAt.localeCompare(b.createdAt))
+      setBillRequested(session.billRequested ?? false)
+      setBillRequestedAt(session.billRequestedAt ?? null)
+      const sessionOrders = (sb
+        ? await sbGetOrdersForSession(session.id)
+        : getOrdersForSession(session.id)
+      ).sort((a, b) => a.createdAt.localeCompare(b.createdAt))
       setOrders(sessionOrders)
 
       setPrevOrderCount((prev) => {
@@ -82,18 +106,48 @@ export default function SessionDetailPage() {
         return sessionOrders.length
       })
     }
-  }, [tableId])
+  }, [tableId, restaurantId])
 
   usePolling(refreshData, 5000)
 
-  function handleStatusChange(orderId: string, newStatus: OrderStatus) {
-    updateOrderStatus(orderId, newStatus)
+  async function handleStatusChange(orderId: string, newStatus: OrderStatus) {
+    if (isSupabaseConfigured()) {
+      await sbUpdateOrderStatus(orderId, newStatus)
+    } else {
+      updateOrderStatus(orderId, newStatus)
+    }
     refreshData()
   }
 
-  function handleCloseSession() {
+  async function handleCloseSession() {
     if (!sessionId) return
-    closeSession(sessionId)
+    if (isSupabaseConfigured()) {
+      await sbCloseSession(sessionId)
+    } else {
+      closeSession(sessionId)
+    }
+    window.location.href = '/dashboard/tpv'
+  }
+
+  async function handleMarkAsPaid() {
+    if (!sessionId) return
+    const sb = isSupabaseConfigured()
+    // Mark all non-cancelled orders as paid
+    for (const order of orders) {
+      if (order.status !== 'cancelled' && order.status !== 'paid') {
+        if (sb) {
+          await sbUpdateOrderStatus(order.id, 'paid')
+        } else {
+          updateOrderStatus(order.id, 'paid')
+        }
+      }
+    }
+    // Close the session
+    if (sb) {
+      await sbCloseSession(sessionId)
+    } else {
+      closeSession(sessionId)
+    }
     window.location.href = '/dashboard/tpv'
   }
 
@@ -148,6 +202,38 @@ export default function SessionDetailPage() {
           )}
         </div>
       </div>
+
+      {/* Bill requested banner */}
+      {billRequested && (
+        <div className="bill-requested rounded-2xl border border-accent/40 bg-accent/5 p-5">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-accent/10 text-2xl animate-pulse">
+                🧾
+              </div>
+              <div>
+                <p className="text-sm font-bold text-accent">CUENTA SOLICITADA</p>
+                {billRequestedAt && (
+                  <p className="text-xs text-foreground-subtle">
+                    Solicitada a las {new Date(billRequestedAt).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}
+                  </p>
+                )}
+              </div>
+            </div>
+            <div className="text-right">
+              <p className="text-xs text-foreground-subtle">Total a cobrar</p>
+              <p className="text-2xl font-bold text-accent">{total.toFixed(2)} €</p>
+            </div>
+          </div>
+          <button
+            onClick={handleMarkAsPaid}
+            className="btn-primary mt-4 w-full flex items-center justify-center gap-2"
+          >
+            <span>💳</span>
+            <span>Marcar como cobrado · {total.toFixed(2)} €</span>
+          </button>
+        </div>
+      )}
 
       {/* Session total */}
       <div className="card">

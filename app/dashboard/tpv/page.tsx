@@ -1,6 +1,7 @@
 'use client'
 
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useRef } from 'react'
+import { useRouter } from 'next/navigation'
 import clsx from 'clsx'
 import {
   getTablesForRestaurant,
@@ -10,8 +11,24 @@ import {
   getActiveSessionForTable,
   getPendingOrdersForRestaurant,
   getSessionsForRestaurant,
+  rotateWaiterAssignments,
+  getCamarerosForRestaurant,
 } from '@/lib/data'
-import type { Table, TableStatus } from '@/types/database'
+import { isSupabaseConfigured } from '@/lib/env'
+import {
+  sbGetTablesForRestaurant,
+  sbUpdateTableStatus,
+  sbCreateSession,
+  sbCloseSession,
+  sbGetActiveSessionForTable,
+  sbGetPendingOrdersForRestaurant,
+  sbGetSessionsForRestaurant,
+  sbRotateWaiterAssignments,
+  sbGetCamarerosForRestaurant,
+} from '@/lib/supabase-data'
+import { useRestaurant } from '@/lib/hooks/use-restaurant'
+import { useAuth } from '@/components/providers/auth-provider'
+import type { Table, TableStatus, User } from '@/types/database'
 import { usePolling } from '@/lib/hooks/use-polling'
 import { useBroadcast } from '@/lib/hooks/use-broadcast'
 import { playOrderSound } from '@/lib/sounds'
@@ -21,8 +38,7 @@ import { PageTransition } from '@/components/ui/page-transition'
 import { StaggeredGrid } from '@/components/ui/staggered-list'
 import { AnimatedCounter } from '@/components/ui/counter'
 import { useToast } from '@/components/ui/toast'
-
-const RESTAURANT_ID = 'rest-1'
+import { BillAlertOverlay, useBillAlerts } from '@/components/ui/bill-alert'
 const POLL_INTERVAL = 5000
 
 const STATUS_FILTERS: { label: string; value: TableStatus | 'all' }[] = [
@@ -42,39 +58,91 @@ function getSessionDuration(startedAt: string): string {
 }
 
 export default function TPVPage() {
+  const router = useRouter()
+  const { user } = useAuth()
+  const { restaurantId } = useRestaurant()
   const [tables, setTables] = useState<Table[]>([])
   const [filter, setFilter] = useState<TableStatus | 'all'>('all')
   const [prevPendingCount, setPrevPendingCount] = useState(0)
   const [sessionMap, setSessionMap] = useState<Record<string, string>>({})
   const [pendingMap, setPendingMap] = useState<Record<string, number>>({})
+  const [billRequestedMap, setBillRequestedMap] = useState<Record<string, boolean>>({})
+  const [activeSessions, setActiveSessions] = useState(0)
+  const [waiterNameMap, setWaiterNameMap] = useState<Record<string, string>>({})
+  const rotationDoneRef = useRef(false)
   const { info } = useToast()
+  const { alerts, showBillAlert, dismissAlert } = useBillAlerts()
+  const isCamarero = user?.role === 'camarero'
 
   const { broadcast } = useBroadcast<string>(() => {
-    // On cross-tab message, refresh data
     refreshData()
   })
 
-  const refreshData = useCallback(() => {
-    const allTables = getTablesForRestaurant(RESTAURANT_ID)
+  const refreshData = useCallback(async () => {
+    if (!restaurantId) return
+
+    const sb = isSupabaseConfigured()
+
+    // Trigger rotation once per day (only owner triggers, camareros just read)
+    if (!rotationDoneRef.current && !isCamarero) {
+      rotationDoneRef.current = true // Mark done BEFORE calling to prevent retries on error
+      try {
+        if (sb) { await sbRotateWaiterAssignments(restaurantId) } else { rotateWaiterAssignments(restaurantId) }
+      } catch (e) {
+        console.warn('Rotation skipped:', e)
+      }
+    }
+
+    // Load waiter names for display
+    const waiters: User[] = sb
+      ? await sbGetCamarerosForRestaurant(restaurantId)
+      : getCamarerosForRestaurant(restaurantId)
+    const wMap: Record<string, string> = {}
+    waiters.forEach((w) => { wMap[w.id] = w.name })
+    setWaiterNameMap(wMap)
+
+    let allTables = sb
+      ? await sbGetTablesForRestaurant(restaurantId)
+      : getTablesForRestaurant(restaurantId)
+
+    // If camarero, filter to only their tables
+    if (isCamarero && user?.id) {
+      allTables = allTables.filter((t) => t.assignedWaiterId === user.id)
+    }
     setTables(allTables)
 
-    // Build session duration map
+    // Build session duration map + bill requested map
     const sMap: Record<string, string> = {}
-    allTables.forEach((t) => {
+    const bMap: Record<string, boolean> = {}
+    for (const t of allTables) {
       if (t.status === 'occupied' || t.status === 'en_route') {
-        const session = getActiveSessionForTable(t.id)
-        if (session) sMap[t.id] = getSessionDuration(session.startedAt)
+        const session = sb
+          ? await sbGetActiveSessionForTable(t.id)
+          : getActiveSessionForTable(t.id)
+        if (session) {
+          sMap[t.id] = getSessionDuration(session.startedAt)
+          if (session.billRequested) bMap[t.id] = true
+        }
       }
-    })
+    }
     setSessionMap(sMap)
+    setBillRequestedMap(bMap)
 
     // Build pending orders map per table
-    const pendingOrders = getPendingOrdersForRestaurant(RESTAURANT_ID)
+    const pendingOrders = sb
+      ? await sbGetPendingOrdersForRestaurant(restaurantId)
+      : getPendingOrdersForRestaurant(restaurantId)
     const pMap: Record<string, number> = {}
     pendingOrders.forEach((o) => {
       pMap[o.tableId] = (pMap[o.tableId] ?? 0) + 1
     })
     setPendingMap(pMap)
+
+    // Active sessions count
+    const sessions = sb
+      ? await sbGetSessionsForRestaurant(restaurantId)
+      : getSessionsForRestaurant(restaurantId)
+    setActiveSessions(sessions.filter((s) => !s.closedAt).length)
 
     // Play sound + toast if new pending orders appeared
     const totalPending = pendingOrders.length
@@ -85,23 +153,45 @@ export default function TPVPage() {
       }
       return totalPending
     })
-  }, [])
+
+    // Show bill alert for newly detected bill requests (only for this user's tables)
+    for (const t of allTables) {
+      if (bMap[t.id]) {
+        const session = sb
+          ? await sbGetActiveSessionForTable(t.id)
+          : getActiveSessionForTable(t.id)
+        showBillAlert({
+          tableName: t.name,
+          tableId: t.id,
+          total: session?.totalAmount ?? 0,
+          requestedAt: new Date().toISOString(),
+        })
+      }
+    }
+  }, [restaurantId])
 
   usePolling(refreshData, POLL_INTERVAL)
-  useTableTimeout(RESTAURANT_ID)
+  useTableTimeout(restaurantId)
 
-  function handleOccupy(table: Table) {
-    createSession(table.id, RESTAURANT_ID)
+  async function handleOccupy(table: Table) {
+    if (isSupabaseConfigured()) {
+      await sbCreateSession(table.id, restaurantId)
+    } else {
+      createSession(table.id, restaurantId)
+    }
     broadcast('table-update')
     refreshData()
   }
 
-  function handleFree(table: Table) {
-    const session = getActiveSessionForTable(table.id)
+  async function handleFree(table: Table) {
+    const sb = isSupabaseConfigured()
+    const session = sb
+      ? await sbGetActiveSessionForTable(table.id)
+      : getActiveSessionForTable(table.id)
     if (session) {
-      closeSession(session.id)
+      if (sb) { await sbCloseSession(session.id) } else { closeSession(session.id) }
     } else {
-      updateTableStatus(table.id, 'free')
+      if (sb) { await sbUpdateTableStatus(table.id, 'free') } else { updateTableStatus(table.id, 'free') }
     }
     broadcast('table-update')
     refreshData()
@@ -109,7 +199,7 @@ export default function TPVPage() {
 
   function handleClick(table: Table) {
     if (table.status === 'occupied' || table.status === 'en_route') {
-      window.location.href = `/dashboard/tpv/${table.id}`
+      router.push(`/dashboard/tpv/${table.id}`)
     }
   }
 
@@ -126,10 +216,16 @@ export default function TPVPage() {
   }
 
   const totalPending = Object.values(pendingMap).reduce((s, n) => s + n, 0)
-  const activeSessions = getSessionsForRestaurant(RESTAURANT_ID).filter((s) => !s.closedAt).length
 
   return (
     <PageTransition className="space-y-6">
+      {/* Bill request alerts overlay */}
+      <BillAlertOverlay
+        alerts={alerts}
+        onDismiss={dismissAlert}
+        onNavigate={(tableId) => router.push(`/dashboard/tpv/${tableId}`)}
+      />
+
       {/* Header */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
@@ -198,6 +294,8 @@ export default function TPVPage() {
               table={t}
               pendingOrders={pendingMap[t.id] ?? 0}
               sessionDuration={sessionMap[t.id]}
+              billRequested={billRequestedMap[t.id] ?? false}
+              waiterName={t.assignedWaiterId ? waiterNameMap[t.assignedWaiterId] : undefined}
               onOccupy={() => handleOccupy(t)}
               onFree={() => handleFree(t)}
               onClick={() => handleClick(t)}

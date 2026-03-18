@@ -2,8 +2,11 @@
 
 import { useEffect, useState } from 'react'
 import clsx from 'clsx'
-import { getUser, getRestaurantsForOwner, getReservationsForRestaurant, updateReservationStatus, getReviewsForRestaurant, saveRestaurant, getRestaurantById, compressImage, getOrdersForRestaurant, getSessionsForRestaurant } from '@/lib/data'
-import type { Restaurant, Reservation, ReservationStatus, Review } from '@/types/database'
+import { getUser, getRestaurantForCurrentUser, getReservationsForRestaurant, updateReservationStatus, getReviewsForRestaurant, saveRestaurant, compressImage, getOrdersForRestaurant, getSessionsForRestaurant } from '@/lib/data'
+import { isSupabaseConfigured } from '@/lib/env'
+import { sbGetRestaurantForCurrentUser, sbGetReservationsForRestaurant, sbUpdateReservationStatus, sbGetReviewsForRestaurant, sbSaveRestaurant, sbGetOrdersForRestaurant, sbGetSessionsForRestaurant } from '@/lib/supabase-data'
+import { useAuth } from '@/components/providers/auth-provider'
+import type { Restaurant, Reservation, ReservationStatus, Review, Order, TableSession } from '@/types/database'
 
 const STATUS_LABEL: Record<ReservationStatus, string> = {
   pending: 'Pendiente',
@@ -20,39 +23,50 @@ const STATUS_COLOR: Record<ReservationStatus, string> = {
 }
 
 export default function DashboardHomePage() {
+  const { user } = useAuth()
   const [restaurant, setRestaurant] = useState<Restaurant | null>(null)
   const [reservations, setReservations] = useState<Reservation[]>([])
+  const [allOrders, setAllOrders] = useState<Order[]>([])
+  const [allSessions, setAllSessions] = useState<TableSession[]>([])
   const [loading, setLoading] = useState(true)
   const [recentReviews, setRecentReviews] = useState<Review[]>([])
   const [galleryUploading, setGalleryUploading] = useState(false)
+  const isCamarero = user?.role === 'camarero'
 
   useEffect(() => {
-    const user = getUser()
     if (!user) return
 
-    const rests = getRestaurantsForOwner(user.id)
-    // Use first restaurant or demo restaurant
-    const rest = rests[0] ?? {
-      id: 'rest-1',
-      name: 'La Taberna del Chef',
-      city: 'madrid',
-      plan: 'pro',
-      capacity: 60,
-      rating: 4.7,
-      reviewCount: 234,
-    } as Restaurant
-    setRestaurant(rest)
-
-    const res = getReservationsForRestaurant('rest-1')
-    setReservations(res)
-
-    const revs = getReviewsForRestaurant('rest-1')
-      .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
-      .slice(0, 3)
-    setRecentReviews(revs)
-
-    setLoading(false)
-  }, [])
+    async function loadData() {
+      if (isSupabaseConfigured()) {
+        const rest = await sbGetRestaurantForCurrentUser()
+        if (!rest) { setLoading(false); return }
+        setRestaurant(rest)
+        const [res, revs, orders, sessions] = await Promise.all([
+          sbGetReservationsForRestaurant(rest.id),
+          sbGetReviewsForRestaurant(rest.id),
+          sbGetOrdersForRestaurant(rest.id),
+          sbGetSessionsForRestaurant(rest.id),
+        ])
+        setReservations(res)
+        setRecentReviews(revs.slice(0, 3))
+        setAllOrders(orders)
+        setAllSessions(sessions)
+      } else {
+        const rest = getRestaurantForCurrentUser()
+        if (!rest) { setLoading(false); return }
+        setRestaurant(rest)
+        setReservations(getReservationsForRestaurant(rest.id))
+        const revs = getReviewsForRestaurant(rest.id)
+          .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+          .slice(0, 3)
+        setRecentReviews(revs)
+        setAllOrders(getOrdersForRestaurant(rest.id))
+        setAllSessions(getSessionsForRestaurant(rest.id))
+      }
+      setLoading(false)
+    }
+    loadData()
+  }, [user])
 
   async function handleGalleryUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
@@ -61,27 +75,29 @@ export default function DashboardHomePage() {
     try {
       const base64 = await compressImage(file)
       const updated = { ...restaurant, images: [...(restaurant.images ?? []), base64] }
-      saveRestaurant(updated)
+      if (isSupabaseConfigured()) await sbSaveRestaurant(updated)
+      else saveRestaurant(updated)
       setRestaurant(updated)
     } catch {
       console.error('Error uploading gallery image')
     }
     setGalleryUploading(false)
-    // Reset file input
     e.target.value = ''
   }
 
-  function removeGalleryImage(idx: number) {
+  async function removeGalleryImage(idx: number) {
     if (!restaurant) return
     const images = [...(restaurant.images ?? [])]
     images.splice(idx, 1)
     const updated = { ...restaurant, images }
-    saveRestaurant(updated)
+    if (isSupabaseConfigured()) await sbSaveRestaurant(updated)
+    else saveRestaurant(updated)
     setRestaurant(updated)
   }
 
-  function changeStatus(id: string, status: ReservationStatus) {
-    updateReservationStatus(id, status)
+  async function changeStatus(id: string, status: ReservationStatus) {
+    if (isSupabaseConfigured()) await sbUpdateReservationStatus(id, status)
+    else updateReservationStatus(id, status)
     setReservations((prev) => prev.map((r) => (r.id === id ? { ...r, status } : r)))
   }
 
@@ -109,21 +125,21 @@ export default function DashboardHomePage() {
   const occupancyPct = restaurant ? Math.round((confirmedToday / (restaurant.capacity / 4)) * 100) : 0
 
   // TPV stats
-  const allOrders = getOrdersForRestaurant('rest-1')
   const todayOrders = allOrders.filter((o) => o.createdAt.slice(0, 10) === today)
   const todayRevenue = allOrders
     .filter((o) => o.status !== 'cancelled')
     .reduce((sum, o) => sum + o.items.reduce((s, i) => s + i.price * i.quantity, 0), 0)
-  const activeSessions = getSessionsForRestaurant('rest-1').filter((s) => !s.closedAt).length
+  const activeSessions = allSessions.filter((s) => !s.closedAt).length
 
-  const stats = [
-    { label: 'Reservas hoy', value: totalToday, sub: `${confirmedToday} confirmadas`, color: 'text-accent' },
-    { label: 'Pendientes', value: pendingCount, sub: 'Requieren atencion', color: 'text-yellow-400' },
-    { label: 'Pedidos hoy', value: todayOrders.length, sub: `${activeSessions} sesiones activas`, color: 'text-emerald-400' },
-    { label: 'Ingresos', value: `${todayRevenue.toFixed(0)}€`, sub: `${allOrders.length} pedidos total`, color: 'text-success' },
-    { label: 'Ocupacion est.', value: `${Math.min(occupancyPct, 100)}%`, sub: `Capacidad: ${restaurant?.capacity ?? 0}`, color: 'text-success' },
-    { label: 'Rating', value: restaurant?.rating ?? 0, sub: `${restaurant?.reviewCount ?? 0} resenas`, color: 'text-accent-soft' },
+  const allStats = [
+    { label: 'Reservas hoy', value: totalToday, sub: `${confirmedToday} confirmadas`, color: 'text-accent', sensitive: false },
+    { label: 'Pendientes', value: pendingCount, sub: 'Requieren atencion', color: 'text-yellow-400', sensitive: false },
+    { label: 'Pedidos hoy', value: todayOrders.length, sub: `${activeSessions} sesiones activas`, color: 'text-emerald-400', sensitive: false },
+    { label: 'Ingresos', value: `${todayRevenue.toFixed(0)}€`, sub: `${allOrders.length} pedidos total`, color: 'text-success', sensitive: true },
+    { label: 'Ocupacion est.', value: `${Math.min(occupancyPct, 100)}%`, sub: `Capacidad: ${restaurant?.capacity ?? 0}`, color: 'text-success', sensitive: false },
+    { label: 'Rating', value: restaurant?.rating ?? 0, sub: `${restaurant?.reviewCount ?? 0} resenas`, color: 'text-accent-soft', sensitive: false },
   ]
+  const stats = isCamarero ? allStats.filter((s) => !s.sensitive) : allStats
 
   return (
     <div className="space-y-8">
@@ -144,9 +160,16 @@ export default function DashboardHomePage() {
             </div>
           </div>
         </div>
-        <p className="text-sm text-foreground-subtle">
-          {new Date().toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
-        </p>
+        <div className="flex items-center gap-3">
+          {!isCamarero && (
+            <a href="/dashboard/perfil" className="text-xs font-medium text-accent hover:underline">
+              Editar perfil →
+            </a>
+          )}
+          <p className="text-sm text-foreground-subtle">
+            {new Date().toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
+          </p>
+        </div>
       </div>
 
       {/* KPI grid */}
@@ -317,7 +340,9 @@ export default function DashboardHomePage() {
       <div>
         <div className="mb-4 flex items-center justify-between">
           <h2 className="text-lg font-semibold text-foreground">Reseñas recientes</h2>
-          <span className="text-xs text-foreground-subtle">{recentReviews.length} última(s)</span>
+          <a href="/dashboard/resenas" className="text-xs font-medium text-accent hover:underline">
+            Ver todas →
+          </a>
         </div>
         {recentReviews.length === 0 ? (
           <div className="card py-12 text-center">

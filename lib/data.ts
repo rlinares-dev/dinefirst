@@ -1,4 +1,4 @@
-import type { User, Restaurant, Table, MenuItem, Reservation, ReservationStatus, Review, TableStatus, TableSession, Order, OrderStatus, OrderItem } from '@/types/database'
+import type { User, Restaurant, Table, MenuItem, Reservation, ReservationStatus, Review, TableStatus, TableSession, Order, OrderStatus, OrderItem, WaiterRotationState } from '@/types/database'
 import {
   MOCK_USERS,
   MOCK_RESTAURANTS,
@@ -55,9 +55,66 @@ export function clearUser(): void {
   if (typeof window !== 'undefined') localStorage.removeItem(KEY_USER)
 }
 
+// ─── User Registry ────────────────────────────────────────────────────────────
+
+const KEY_USERS = 'df_users'
+
+export function getUsers(): User[] {
+  return load<User[]>(KEY_USERS, MOCK_USERS)
+}
+
 export function loginWithCredentials(email: string, password: string): User | null {
   if (password !== 'password123') return null
-  return MOCK_USERS.find((u) => u.email === email) ?? null
+  return getUsers().find((u) => u.email === email && u.role !== 'camarero') ?? null
+}
+
+export function loginCamarero(username: string, password: string, restaurantSlug: string): User | null {
+  if (password !== 'password123') return null
+  const restaurants = load<Restaurant[]>(KEY_RESTAURANTS, MOCK_RESTAURANTS)
+  const restaurant = restaurants.find((r) => r.slug === restaurantSlug)
+  if (!restaurant) return null
+  return getUsers().find(
+    (u) => u.role === 'camarero' && u.restaurantId === restaurant.id && u.username === username
+  ) ?? null
+}
+
+export function getRestaurantSlugs(): string[] {
+  const restaurants = load<Restaurant[]>(KEY_RESTAURANTS, MOCK_RESTAURANTS)
+  return restaurants.map((r) => r.slug)
+}
+
+export function getCamarerosForRestaurant(restaurantId: string): User[] {
+  return getUsers().filter((u) => u.role === 'camarero' && u.restaurantId === restaurantId)
+}
+
+export function isUsernameTaken(username: string, restaurantId: string): boolean {
+  return getCamarerosForRestaurant(restaurantId).some((u) => u.username === username)
+}
+
+export function createCamarero(data: { name: string; username: string; phone: string; restaurantId: string }): User {
+  const users = getUsers()
+  const newUser: User = {
+    id: generateId(),
+    name: data.name,
+    email: '',
+    username: data.username,
+    role: 'camarero',
+    phone: data.phone,
+    createdAt: new Date().toISOString(),
+    restaurantId: data.restaurantId,
+  }
+  users.push(newUser)
+  save(KEY_USERS, users)
+  return newUser
+}
+
+export function deleteCamarero(id: string): void {
+  const users = getUsers()
+  const idx = users.findIndex((u) => u.id === id && u.role === 'camarero')
+  if (idx >= 0) {
+    users.splice(idx, 1)
+    save(KEY_USERS, users)
+  }
 }
 
 // ─── Restaurants ──────────────────────────────────────────────────────────────
@@ -79,6 +136,16 @@ export function getRestaurantById(id: string): Restaurant | null {
 
 export function getRestaurantsForOwner(ownerId: string): Restaurant[] {
   return getRestaurants().filter((r) => r.ownerId === ownerId)
+}
+
+export function getRestaurantForCurrentUser(): Restaurant | null {
+  const user = getUser()
+  if (!user) return null
+  if (user.role === 'camarero' && user.restaurantId) {
+    return getRestaurantById(user.restaurantId)
+  }
+  const rests = getRestaurantsForOwner(user.id)
+  return rests[0] ?? getRestaurantById('rest-1')
 }
 
 export function saveRestaurant(restaurant: Restaurant): void {
@@ -197,6 +264,16 @@ export function deleteReview(id: string): void {
   save(KEY_REVIEWS, list)
 }
 
+export function respondToReview(reviewId: string, response: string): void {
+  const list = getReviews()
+  const review = list.find((r) => r.id === reviewId)
+  if (review) {
+    review.response = response
+    review.respondedAt = new Date().toISOString()
+    save(KEY_REVIEWS, list)
+  }
+}
+
 export function recalculateRestaurantRating(restaurantId: string): void {
   const reviews = getReviewsForRestaurant(restaurantId)
   const restaurant = getRestaurantById(restaurantId)
@@ -277,6 +354,25 @@ export function closeSession(sessionId: string): void {
     )
     save(KEY_SESSIONS, list)
     updateTableStatus(session.tableId, 'free')
+  }
+}
+
+export function getSessionById(sessionId: string): TableSession | null {
+  return getSessions().find((s) => s.id === sessionId) ?? null
+}
+
+export function requestBill(sessionId: string): void {
+  const list = getSessions()
+  const session = list.find((s) => s.id === sessionId)
+  if (session) {
+    session.billRequested = true
+    session.billRequestedAt = new Date().toISOString()
+    // Pre-calculate total from non-cancelled orders
+    const orders = getOrdersForSession(sessionId)
+    session.totalAmount = orders
+      .filter((o) => o.status !== 'cancelled')
+      .reduce((sum, o) => sum + o.items.reduce((s, i) => s + i.price * i.quantity, 0), 0)
+    save(KEY_SESSIONS, list)
   }
 }
 
@@ -373,4 +469,105 @@ export function compressImage(file: File): Promise<string> {
     reader.onerror = reject
     reader.readAsDataURL(file)
   })
+}
+
+// ─── Waiter Assignment & Rotation ────────────────────────────────────────────
+
+const KEY_ROTATION_STATE = 'df_rotation_state'
+
+function getTodayDate(): string {
+  return new Date().toISOString().slice(0, 10)
+}
+
+export function getRotationState(restaurantId: string): WaiterRotationState | null {
+  const all = load<Record<string, WaiterRotationState>>(KEY_ROTATION_STATE, {})
+  return all[restaurantId] ?? null
+}
+
+function saveRotationState(state: WaiterRotationState): void {
+  const all = load<Record<string, WaiterRotationState>>(KEY_ROTATION_STATE, {})
+  all[state.restaurantId] = state
+  save(KEY_ROTATION_STATE, all)
+}
+
+export function assignWaiterToTable(tableId: string, waiterId: string | null): void {
+  const list = getTables()
+  const idx = list.findIndex((t) => t.id === tableId)
+  if (idx >= 0) {
+    list[idx] = { ...list[idx], assignedWaiterId: waiterId ?? undefined }
+    save(KEY_TABLES, list)
+  }
+}
+
+/**
+ * Rotate waiter-table assignments for a restaurant.
+ * Only runs once per day (based on lastRotationDate).
+ * Returns true if rotation happened, false if skipped.
+ */
+export function rotateWaiterAssignments(restaurantId: string): boolean {
+  const today = getTodayDate()
+  const state = getRotationState(restaurantId)
+
+  // Skip if already rotated today
+  if (state && state.lastRotationDate === today) return false
+
+  const tables = getTablesForRestaurant(restaurantId)
+    .filter((t) => t.status !== 'inactive')
+    .sort((a, b) => a.name.localeCompare(b.name))
+
+  const waiters = getCamarerosForRestaurant(restaurantId)
+    .sort((a, b) => a.id.localeCompare(b.id))
+
+  if (waiters.length === 0 || tables.length === 0) return false
+
+  // Round-robin assignment
+  const assignments: Record<string, string> = {}
+  const tablesPerWaiter = Math.floor(tables.length / waiters.length)
+  const extraTables = tables.length % waiters.length
+
+  // Determine who gets extra tables — alternate from last time
+  let extraStartIdx = 0
+  if (state?.lastExtraWaiterId) {
+    const lastIdx = waiters.findIndex((w) => w.id === state.lastExtraWaiterId)
+    if (lastIdx >= 0) extraStartIdx = (lastIdx + 1) % waiters.length
+  }
+
+  let tableIdx = 0
+  let newExtraWaiterId: string | null = null
+
+  for (let i = 0; i < waiters.length; i++) {
+    const waiterIdx = (extraStartIdx + i) % waiters.length
+    const waiter = waiters[waiterIdx]
+    const count = tablesPerWaiter + (i < extraTables ? 1 : 0)
+    if (i < extraTables) newExtraWaiterId = waiter.id
+
+    for (let j = 0; j < count; j++) {
+      if (tableIdx < tables.length) {
+        assignments[tables[tableIdx].id] = waiter.id
+        tableIdx++
+      }
+    }
+  }
+
+  // Apply assignments
+  const allTables = getTables()
+  for (const [tId, wId] of Object.entries(assignments)) {
+    const idx = allTables.findIndex((t) => t.id === tId)
+    if (idx >= 0) allTables[idx] = { ...allTables[idx], assignedWaiterId: wId }
+  }
+  save(KEY_TABLES, allTables)
+
+  // Save rotation state
+  saveRotationState({
+    restaurantId,
+    lastRotationDate: today,
+    lastExtraWaiterId: newExtraWaiterId,
+    updatedAt: new Date().toISOString(),
+  })
+
+  return true
+}
+
+export function getTablesForWaiter(restaurantId: string, waiterId: string): Table[] {
+  return getTablesForRestaurant(restaurantId).filter((t) => t.assignedWaiterId === waiterId)
 }

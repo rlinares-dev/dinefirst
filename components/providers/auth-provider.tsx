@@ -9,6 +9,7 @@ interface AuthContextType {
   loading: boolean
   isAuthenticated: boolean
   signIn: (email: string, password: string) => Promise<{ error: string | null }>
+  signInCamarero: (username: string, password: string, restaurantSlug: string) => Promise<{ error: string | null }>
   signUp: (data: SignUpData) => Promise<{ error: string | null }>
   signInWithGoogle: () => Promise<void>
   signOut: () => Promise<void>
@@ -33,6 +34,8 @@ function profileToUser(profile: {
   role: string
   phone: string | null
   created_at: string
+  username?: string | null
+  restaurant_id?: string | null
 }): User {
   return {
     id: profile.id,
@@ -41,6 +44,8 @@ function profileToUser(profile: {
     role: profile.role as User['role'],
     phone: profile.phone || '',
     createdAt: profile.created_at,
+    ...(profile.restaurant_id ? { restaurantId: profile.restaurant_id } : {}),
+    ...(profile.username ? { username: profile.username } : {}),
   }
 }
 
@@ -124,6 +129,48 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const { error } = await supabase.auth.signInWithPassword({ email, password })
     if (error) return { error: error.message }
     return { error: null }
+  }, [])
+
+  const signInCamarero = useCallback(async (username: string, password: string, restaurantSlug: string) => {
+    if (!isSupabaseConfigured()) {
+      const { loginCamarero, setUser: saveUser } = require('@/lib/data')
+      const u = loginCamarero(username, password, restaurantSlug)
+      if (!u) return { error: 'Usuario, contraseña o restaurante incorrectos.' }
+      saveUser(u)
+      setUser(u)
+      return { error: null }
+    }
+
+    try {
+      const { createClient } = await import('@/lib/supabase/client')
+      const supabase = createClient()
+
+      // Find restaurant by slug
+      const { data: restaurant } = await supabase
+        .from('restaurants')
+        .select('id')
+        .eq('slug', restaurantSlug)
+        .single()
+      if (!restaurant) return { error: 'Restaurante no encontrado.' }
+
+      // Find camarero profile by username + restaurant
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('email')
+        .eq('role', 'camarero')
+        .eq('username', username)
+        .eq('restaurant_id', restaurant.id)
+        .single()
+      if (!profile?.email) return { error: 'Usuario no encontrado en este restaurante.' }
+
+      // Sign in with the internal email
+      const { error } = await supabase.auth.signInWithPassword({ email: profile.email, password })
+      if (error) return { error: 'Contraseña incorrecta.' }
+      return { error: null }
+    } catch (err) {
+      console.error('signInCamarero error:', err)
+      return { error: 'Error al iniciar sesión.' }
+    }
   }, [])
 
   const signUp = useCallback(async (data: SignUpData) => {
@@ -215,6 +262,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         loading,
         isAuthenticated: !!user,
         signIn,
+        signInCamarero,
         signUp,
         signInWithGoogle,
         signOut,

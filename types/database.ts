@@ -1,4 +1,4 @@
-export type Role = 'comensal' | 'restaurante' | 'admin'
+export type Role = 'comensal' | 'restaurante' | 'admin' | 'camarero'
 export type Plan = 'basic' | 'pro' | 'premium'
 export type ReservationStatus = 'pending' | 'confirmed' | 'cancelled' | 'no_show'
 export type MenuCategory = 'entrantes' | 'principales' | 'postres' | 'bebidas'
@@ -13,6 +13,8 @@ export interface User {
   role: Role
   phone: string
   createdAt: string
+  restaurantId?: string
+  username?: string // Only for camarero — unique per restaurant, used for login
 }
 
 export interface Restaurant {
@@ -43,6 +45,7 @@ export interface Table {
   status: TableStatus
   location: string
   qrCode: string
+  assignedWaiterId?: string
 }
 
 export interface TableSession {
@@ -52,6 +55,9 @@ export interface TableSession {
   startedAt: string
   closedAt: string | null
   totalAmount: number
+  billRequested?: boolean
+  billRequestedAt?: string
+  waiterId?: string
 }
 
 export interface Order {
@@ -63,6 +69,7 @@ export interface Order {
   items: OrderItem[]
   notes: string
   createdAt: string
+  waiterId?: string
 }
 
 export interface OrderItem {
@@ -114,6 +121,15 @@ export interface Review {
   rating: ReviewRating
   comment: string
   createdAt: string
+  response?: string
+  respondedAt?: string
+}
+
+export interface WaiterRotationState {
+  restaurantId: string
+  lastRotationDate: string // YYYY-MM-DD
+  lastExtraWaiterId: string | null
+  updatedAt: string
 }
 
 export interface PlanFeature {
