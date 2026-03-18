@@ -3,8 +3,13 @@
  * Run: node scripts/seed-supabase.mjs
  */
 
-const SUPABASE_URL = 'https://axrcsdblzqphcdazlhho.supabase.co'
-const SERVICE_ROLE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF4cmNzZGJsenFwaGNkYXpsaGhvIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MzQxMDkyNSwiZXhwIjoyMDg4OTg2OTI1fQ.Uxs-RDkdBepaay3eI38SOGmm70a_rk___cINkKCG584'
+const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL
+const SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY
+
+if (!SUPABASE_URL || !SERVICE_ROLE_KEY) {
+  console.error('Missing env vars. Run: source .env.local or set NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY')
+  process.exit(1)
+}
 
 const headers = {
   'Content-Type': 'application/json',
