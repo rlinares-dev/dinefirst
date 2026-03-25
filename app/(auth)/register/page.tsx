@@ -4,6 +4,7 @@ import { useState } from 'react'
 import clsx from 'clsx'
 import { useAuth } from '@/components/providers/auth-provider'
 import { isSupabaseConfigured } from '@/lib/env'
+import { emailWelcome } from '@/lib/email-client'
 import type { Role } from '@/types/database'
 
 export default function RegisterPage() {
@@ -59,6 +60,9 @@ export default function RegisterPage() {
         })
       }
     }
+
+    // Enviar email de bienvenida (non-blocking)
+    emailWelcome({ userName: name, userEmail: email, role: signUpRole })
 
     if (role === 'restaurante') window.location.href = '/dashboard'
     else window.location.href = '/app'

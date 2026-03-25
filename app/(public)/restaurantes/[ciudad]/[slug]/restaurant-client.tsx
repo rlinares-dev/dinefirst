@@ -17,6 +17,7 @@ import {
   getVerifiableReservation,
 } from '@/lib/data'
 import { notifyReservationCreated } from '@/lib/notifications'
+import { emailReservationConfirmation } from '@/lib/email-client'
 import type { Restaurant, Table, MenuItem, MenuCategory, Review, ReviewRating } from '@/types/database'
 
 const CATEGORY_LABELS: Record<MenuCategory, string> = {
@@ -163,6 +164,18 @@ export default function RestaurantClient({ ciudad, slug }: Props) {
         console.warn('Error enviando notificación WhatsApp')
       }
     }
+
+    // Enviar email de confirmación (non-blocking)
+    emailReservationConfirmation({
+      userName: reservation.userName,
+      userEmail: reservation.userEmail,
+      restaurantName: restaurant.name,
+      date: reservation.date,
+      time: reservation.time,
+      partySize: reservation.partySize,
+      confirmationCode: code,
+      specialRequests: reservation.specialRequests || undefined,
+    })
 
     setConfirmationCode(code)
     setBookingStatus('success')

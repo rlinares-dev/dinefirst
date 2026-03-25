@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import clsx from 'clsx'
 import { getUser, getReservationsForUser, updateReservationStatus } from '@/lib/data'
+import { emailReservationCancellation } from '@/lib/email-client'
 import type { Reservation, ReservationStatus } from '@/types/database'
 
 const STATUS_LABEL: Record<ReservationStatus, string> = {
@@ -39,9 +40,22 @@ export default function AppReservasPage() {
   }, [])
 
   function confirmCancel(id: string) {
+    const reservation = reservations.find((r) => r.id === id)
     updateReservationStatus(id, 'cancelled')
     setReservations((prev) => prev.map((r) => (r.id === id ? { ...r, status: 'cancelled' } : r)))
     setCancelId(null)
+
+    // Enviar email de cancelación (non-blocking)
+    if (reservation) {
+      emailReservationCancellation({
+        userName: reservation.userName,
+        userEmail: reservation.userEmail,
+        restaurantName: reservation.restaurantName,
+        date: reservation.date,
+        time: reservation.time,
+        confirmationCode: reservation.confirmationCode,
+      })
+    }
   }
 
   const today = new Date().toISOString().slice(0, 10)
