@@ -168,6 +168,15 @@ export const MOCK_SESSIONS: TableSession[] = [
     closedAt: null,
     totalAmount: 57,
   },
+  // ─── Sesiones históricas cerradas (rest-1) ──────────────────────────
+  { id: 'sess-h1', tableId: 't1-2', restaurantId: 'rest-1', startedAt: '2026-03-14T13:00:00Z', closedAt: '2026-03-14T15:10:00Z', totalAmount: 90 },
+  { id: 'sess-h2', tableId: 't1-6', restaurantId: 'rest-1', startedAt: '2026-03-14T20:00:00Z', closedAt: '2026-03-14T22:30:00Z', totalAmount: 62 },
+  { id: 'sess-h3', tableId: 't1-1', restaurantId: 'rest-1', startedAt: '2026-03-13T12:30:00Z', closedAt: '2026-03-13T14:45:00Z', totalAmount: 48 },
+  { id: 'sess-h4', tableId: 't1-3', restaurantId: 'rest-1', startedAt: '2026-03-12T20:00:00Z', closedAt: '2026-03-12T22:15:00Z', totalAmount: 92 },
+  { id: 'sess-h5', tableId: 't1-2', restaurantId: 'rest-1', startedAt: '2026-03-11T13:00:00Z', closedAt: '2026-03-11T15:00:00Z', totalAmount: 44 },
+  { id: 'sess-h6', tableId: 't1-6', restaurantId: 'rest-1', startedAt: '2026-03-10T19:30:00Z', closedAt: '2026-03-10T22:00:00Z', totalAmount: 108 },
+  { id: 'sess-h7', tableId: 't1-1', restaurantId: 'rest-1', startedAt: '2026-03-09T12:00:00Z', closedAt: '2026-03-09T14:15:00Z', totalAmount: 64 },
+  { id: 'sess-h8', tableId: 't1-4', restaurantId: 'rest-1', startedAt: '2026-03-08T20:00:00Z', closedAt: '2026-03-08T22:45:00Z', totalAmount: 78 },
 ]
 
 export const MOCK_ORDERS: Order[] = [
@@ -437,16 +446,16 @@ export const MOCK_RESERVATIONS: Reservation[] = [
 
 export const MOCK_REVIEWS: Review[] = [
   // La Taberna del Chef (rest-1) — rating ~4.7
-  { id: 'rev-1', restaurantId: 'rest-1', userId: 'user-com-1', userName: 'María García', rating: 5, comment: 'Las croquetas de jamón ibérico son las mejores que he probado en Madrid. Ambiente íntimo y servicio impecable. Volveremos seguro.', createdAt: '2026-03-01T12:00:00Z', response: 'Muchas gracias María! Nos alegra que disfrutaras de las croquetas, son nuestro orgullo. Te esperamos pronto!', respondedAt: '2026-03-02T10:00:00Z' },
-  { id: 'rev-2', restaurantId: 'rest-1', userId: 'user-com-2', userName: 'Javier López', rating: 5, comment: 'El cocido madrileño de tres vuelcos es espectacular. Productos de primera calidad y una presentación muy cuidada.', createdAt: '2026-02-25T19:00:00Z', response: 'Gracias Javier! El cocido es nuestro plato estrella. Usamos garbanzos de Fuentesaúco y productos de temporada.', respondedAt: '2026-02-26T11:00:00Z' },
-  { id: 'rev-3', restaurantId: 'rest-1', userId: 'user-com-3', userName: 'Laura Martínez', rating: 4, comment: 'Muy buena cocina aunque la espera fue algo larga. La torrija caramelizada es un pecado delicioso.', createdAt: '2026-02-18T21:30:00Z' },
-  { id: 'rev-4', restaurantId: 'rest-1', userId: 'user-com-4', userName: 'Pablo Ruiz', rating: 4, comment: 'Gran relación calidad-precio para el nivel de cocina que ofrecen. El steak tartar, perfecto.', createdAt: '2026-02-10T14:00:00Z', response: 'Apreciamos tu comentario Pablo. El steak tartar lo preparamos con solomillo cortado a cuchillo al momento!', respondedAt: '2026-02-12T09:00:00Z' },
+  { id: 'rev-1', restaurantId: 'rest-1', userId: 'user-com-1', userName: 'María García', rating: 5, comment: 'Las croquetas de jamón ibérico son las mejores que he probado en Madrid. Ambiente íntimo y servicio impecable. Volveremos seguro.', createdAt: '2026-03-01T12:00:00Z', response: 'Muchas gracias María! Nos alegra que disfrutaras de las croquetas, son nuestro orgullo. Te esperamos pronto!', respondedAt: '2026-03-02T10:00:00Z', verified: true, reservationId: 'res-1' },
+  { id: 'rev-2', restaurantId: 'rest-1', userId: 'user-com-2', userName: 'Javier López', rating: 5, comment: 'El cocido madrileño de tres vuelcos es espectacular. Productos de primera calidad y una presentación muy cuidada.', createdAt: '2026-02-25T19:00:00Z', response: 'Gracias Javier! El cocido es nuestro plato estrella. Usamos garbanzos de Fuentesaúco y productos de temporada.', respondedAt: '2026-02-26T11:00:00Z', verified: true, reservationId: 'res-2' },
+  { id: 'rev-3', restaurantId: 'rest-1', userId: 'user-com-3', userName: 'Laura Martínez', rating: 4, comment: 'Muy buena cocina aunque la espera fue algo larga. La torrija caramelizada es un pecado delicioso.', createdAt: '2026-02-18T21:30:00Z', verified: false },
+  { id: 'rev-4', restaurantId: 'rest-1', userId: 'user-com-4', userName: 'Pablo Ruiz', rating: 4, comment: 'Gran relación calidad-precio para el nivel de cocina que ofrecen. El steak tartar, perfecto.', createdAt: '2026-02-10T14:00:00Z', response: 'Apreciamos tu comentario Pablo. El steak tartar lo preparamos con solomillo cortado a cuchillo al momento!', respondedAt: '2026-02-12T09:00:00Z', verified: true, reservationId: 'res-4' },
   // El Rincón de la Abuela (rest-2) — rating ~4.9
-  { id: 'rev-5', restaurantId: 'rest-2', userId: 'user-com-1', userName: 'María García', rating: 5, comment: 'La crema catalana de la abuela es legendaria. Cuatro generaciones de saber hacer se notan en cada plato.', createdAt: '2026-03-05T13:00:00Z' },
-  { id: 'rev-6', restaurantId: 'rest-2', userId: 'user-com-2', userName: 'Javier López', rating: 5, comment: 'Fideuà de gambas increíble. El patio interior es un oasis en Barcelona. Reservad con antelación.', createdAt: '2026-02-28T20:00:00Z' },
-  { id: 'rev-7', restaurantId: 'rest-2', userId: 'user-com-5', userName: 'Ana Torres', rating: 5, comment: 'Pa amb tomàquet y mel i mató para terminar. Sencillo pero perfecto. Autenticidad catalana en estado puro.', createdAt: '2026-02-20T12:30:00Z' },
+  { id: 'rev-5', restaurantId: 'rest-2', userId: 'user-com-1', userName: 'María García', rating: 5, comment: 'La crema catalana de la abuela es legendaria. Cuatro generaciones de saber hacer se notan en cada plato.', createdAt: '2026-03-05T13:00:00Z', verified: true, reservationId: 'res-5' },
+  { id: 'rev-6', restaurantId: 'rest-2', userId: 'user-com-2', userName: 'Javier López', rating: 5, comment: 'Fideuà de gambas increíble. El patio interior es un oasis en Barcelona. Reservad con antelación.', createdAt: '2026-02-28T20:00:00Z', verified: true, reservationId: 'res-6' },
+  { id: 'rev-7', restaurantId: 'rest-2', userId: 'user-com-5', userName: 'Ana Torres', rating: 5, comment: 'Pa amb tomàquet y mel i mató para terminar. Sencillo pero perfecto. Autenticidad catalana en estado puro.', createdAt: '2026-02-20T12:30:00Z', verified: false },
   // Sake & Fusion (rest-3) — rating ~4.5
-  { id: 'rev-8', restaurantId: 'rest-3', userId: 'user-com-1', userName: 'María García', rating: 5, comment: 'El omakase del chef es una experiencia única. Fusión japonesa-mediterránea muy bien ejecutada.', createdAt: '2026-03-08T21:00:00Z' },
-  { id: 'rev-9', restaurantId: 'rest-3', userId: 'user-com-2', userName: 'Javier López', rating: 4, comment: 'Ramen tonkotsu con cerdo ibérico: una locura. El sake Junmai Daiginjo marida genial.', createdAt: '2026-03-02T20:30:00Z' },
-  { id: 'rev-10', restaurantId: 'rest-3', userId: 'user-com-6', userName: 'Carlos Fernández', rating: 4, comment: 'Gyozas de cerdo ibérico muy originales. Solo abren de miércoles a domingo, tened cuidado.', createdAt: '2026-02-15T13:30:00Z' },
+  { id: 'rev-8', restaurantId: 'rest-3', userId: 'user-com-1', userName: 'María García', rating: 5, comment: 'El omakase del chef es una experiencia única. Fusión japonesa-mediterránea muy bien ejecutada.', createdAt: '2026-03-08T21:00:00Z', verified: true, reservationId: 'res-7' },
+  { id: 'rev-9', restaurantId: 'rest-3', userId: 'user-com-2', userName: 'Javier López', rating: 4, comment: 'Ramen tonkotsu con cerdo ibérico: una locura. El sake Junmai Daiginjo marida genial.', createdAt: '2026-03-02T20:30:00Z', verified: false },
+  { id: 'rev-10', restaurantId: 'rest-3', userId: 'user-com-6', userName: 'Carlos Fernández', rating: 4, comment: 'Gyozas de cerdo ibérico muy originales. Solo abren de miércoles a domingo, tened cuidado.', createdAt: '2026-02-15T13:30:00Z', verified: false },
 ]

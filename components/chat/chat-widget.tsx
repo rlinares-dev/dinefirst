@@ -107,7 +107,16 @@ export default function ChatWidget() {
           setStreaming(false)
           return
         }
-        throw new Error(data.error || 'Error del servidor')
+        // Show the actual error message from the API
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.id === assistantMsg.id
+              ? { ...m, content: data.error || 'Error del servidor. Inténtalo de nuevo.' }
+              : m
+          )
+        )
+        setStreaming(false)
+        return
       }
 
       // Parse SSE stream

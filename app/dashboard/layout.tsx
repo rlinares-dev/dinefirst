@@ -19,6 +19,7 @@ const ALL_NAV_ITEMS: { href: string; label: string; icon: string; roles: Role[] 
   { href: '/dashboard/mesas', label: 'Mesas', icon: '⊞', roles: ['restaurante', 'admin', 'camarero'] },
   { href: '/dashboard/menu', label: 'Menú', icon: '☰', roles: ['restaurante', 'admin', 'camarero'] },
   { href: '/dashboard/resenas', label: 'Reseñas', icon: '★', roles: ['restaurante', 'admin', 'camarero'] },
+  { href: '/dashboard/historial', label: 'Historial', icon: '▦', roles: ['restaurante', 'admin'] },
   { href: '/dashboard/equipo', label: 'Equipo', icon: '◇', roles: ['restaurante', 'admin'] },
   { href: '/dashboard/perfil', label: 'Perfil', icon: '◐', roles: ['restaurante', 'admin'] },
   { href: '/dashboard/analiticas', label: 'Analíticas', icon: '◉', roles: ['restaurante', 'admin'] },

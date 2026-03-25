@@ -14,6 +14,7 @@ import {
   generateId,
   generateConfirmationCode,
   getRestaurantById,
+  getVerifiableReservation,
 } from '@/lib/data'
 import { notifyReservationCreated } from '@/lib/notifications'
 import type { Restaurant, Table, MenuItem, MenuCategory, Review, ReviewRating } from '@/types/database'
@@ -172,6 +173,9 @@ export default function RestaurantClient({ ciudad, slug }: Props) {
     const user = getUser()
     if (!user || user.role !== 'comensal' || !restaurant) return
 
+    // Check if this can be a verified review
+    const verifiableReservationId = getVerifiableReservation(user.id, restaurant.id)
+
     const review: Review = {
       id: generateId(),
       restaurantId: restaurant.id,
@@ -180,6 +184,8 @@ export default function RestaurantClient({ ciudad, slug }: Props) {
       rating: reviewRating,
       comment: reviewComment.trim(),
       createdAt: new Date().toISOString(),
+      verified: !!verifiableReservationId,
+      reservationId: verifiableReservationId ?? undefined,
     }
     saveReview(review)
     recalculateRestaurantRating(restaurant.id)
@@ -198,6 +204,7 @@ export default function RestaurantClient({ ciudad, slug }: Props) {
   const currentUser = typeof window !== 'undefined' ? getUser() : null
   const canReview = currentUser?.role === 'comensal'
   const hasReviewed = reviews.some((r) => r.userId === currentUser?.id)
+  const canVerify = currentUser && restaurant ? !!getVerifiableReservation(currentUser.id, restaurant.id) : false
 
   const availableCategories = [...new Set(menuItems.map((m) => m.category))] as MenuCategory[]
   const menuInCategory = menuItems.filter((m) => m.category === menuTab)
@@ -433,6 +440,17 @@ export default function RestaurantClient({ ciudad, slug }: Props) {
               {showReviewForm && canReview && (
                 <form onSubmit={handleReviewSubmit} className="card mb-4 border-accent/20 animate-fade-in">
                   <p className="text-sm font-semibold text-foreground mb-3">Tu valoración</p>
+                  {canVerify ? (
+                    <div className="mb-3 flex items-center gap-2 rounded-lg bg-success/10 border border-success/20 px-3 py-2">
+                      <span className="text-success text-sm">✓</span>
+                      <span className="text-xs text-success">Reseña verificada — tienes una reserva confirmada</span>
+                    </div>
+                  ) : (
+                    <div className="mb-3 flex items-center gap-2 rounded-lg bg-foreground-subtle/10 border border-border-subtle px-3 py-2">
+                      <span className="text-foreground-subtle text-sm">ℹ</span>
+                      <span className="text-[11px] text-foreground-subtle">Sin reserva verificada. Tu reseña se publicará sin distintivo.</span>
+                    </div>
+                  )}
                   <StarSelector value={reviewRating} onChange={setReviewRating} />
                   <textarea
                     value={reviewComment}
@@ -477,7 +495,14 @@ export default function RestaurantClient({ ciudad, slug }: Props) {
                             {rev.userName.charAt(0)}
                           </div>
                           <div>
-                            <p className="text-sm font-semibold text-foreground">{rev.userName}</p>
+                            <div className="flex items-center gap-1.5">
+                              <p className="text-sm font-semibold text-foreground">{rev.userName}</p>
+                              {rev.verified && (
+                                <span className="inline-flex items-center gap-0.5 rounded-full bg-success/10 border border-success/20 px-1.5 py-0.5 text-[9px] font-semibold text-success">
+                                  ✓ Verificada
+                                </span>
+                              )}
+                            </div>
                             <p className="text-[10px] text-foreground-subtle">
                               {new Date(rev.createdAt).toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' })}
                             </p>
@@ -489,6 +514,12 @@ export default function RestaurantClient({ ciudad, slug }: Props) {
                         </span>
                       </div>
                       <p className="text-xs text-foreground-subtle leading-relaxed">{rev.comment}</p>
+                      {rev.response && (
+                        <div className="mt-3 rounded-lg bg-background-soft p-3 border-l-2 border-accent">
+                          <p className="text-[10px] font-semibold text-accent mb-1">Respuesta del restaurante</p>
+                          <p className="text-xs text-foreground-subtle leading-relaxed">{rev.response}</p>
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>

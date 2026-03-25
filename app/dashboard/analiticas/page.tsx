@@ -1,14 +1,46 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useCallback, useState } from 'react'
 import clsx from 'clsx'
-import { getReservationsForRestaurant, getOrdersForRestaurant } from '@/lib/data'
+import {
+  getReservationsForRestaurant,
+  getOrdersForRestaurant,
+  getSessionsForRestaurant,
+  getTablesForRestaurant,
+  getCamarerosForRestaurant,
+} from '@/lib/data'
 import { isSupabaseConfigured } from '@/lib/env'
-import { sbGetReservationsForRestaurant, sbGetOrdersForRestaurant } from '@/lib/supabase-data'
+import {
+  sbGetReservationsForRestaurant,
+  sbGetOrdersForRestaurant,
+  sbGetSessionsForRestaurant,
+  sbGetTablesForRestaurant,
+  sbGetCamarerosForRestaurant,
+} from '@/lib/supabase-data'
 import { useRestaurant } from '@/lib/hooks/use-restaurant'
-import type { Reservation, Order } from '@/types/database'
+import { usePolling } from '@/lib/hooks/use-polling'
+import { PageTransition } from '@/components/ui/page-transition'
+import type { Reservation, Order, TableSession, Table, User } from '@/types/database'
+
+// ── Helpers ──────────────────────────────────────────────────────────
 
 const DAYS = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom']
+
+function formatCurrency(amount: number): string {
+  return amount.toFixed(2).replace('.', ',') + '€'
+}
+
+function periodDays(period: '7d' | '30d' | '90d'): number {
+  return period === '7d' ? 7 : period === '30d' ? 30 : 90
+}
+
+function isWithinPeriod(dateStr: string, days: number): boolean {
+  const d = new Date(dateStr)
+  const cutoff = new Date(Date.now() - days * 24 * 60 * 60 * 1000)
+  return d >= cutoff
+}
+
+// ── Sub-components ───────────────────────────────────────────────────
 
 function StatBar({ label, value, max, color }: { label: string; value: number; max: number; color: string }) {
   const pct = max === 0 ? 0 : Math.round((value / max) * 100)
@@ -25,89 +57,145 @@ function StatBar({ label, value, max, color }: { label: string; value: number; m
   )
 }
 
-function HourBar({ hour, count, max }: { hour: string; count: number; max: number }) {
-  const pct = max === 0 ? 0 : (count / max) * 100
+function BarChart({ data, color = 'bg-accent/80' }: { data: { label: string; value: number; sub?: string }[]; color?: string }) {
+  const maxVal = Math.max(...data.map((d) => d.value), 1)
   return (
-    <div className="flex flex-col items-center gap-1">
-      <span className="text-xs font-medium text-foreground">{count > 0 ? count : ''}</span>
-      <div className="relative w-8 rounded bg-border-subtle" style={{ height: '80px' }}>
-        <div
-          className="absolute bottom-0 w-full rounded bg-accent/70 transition-all duration-700"
-          style={{ height: `${pct}%` }}
-        />
-      </div>
-      <span className="text-xs text-foreground-subtle">{hour}</span>
+    <div className="flex items-end justify-between gap-2">
+      {data.map((d) => {
+        const pct = (d.value / maxVal) * 100
+        return (
+          <div key={d.label} className="flex flex-1 flex-col items-center gap-1">
+            <span className="text-xs font-medium text-foreground">{d.value > 0 ? d.sub ?? d.value : ''}</span>
+            <div className="relative w-full rounded bg-border-subtle" style={{ height: '100px' }}>
+              <div
+                className={clsx('absolute bottom-0 w-full rounded transition-all duration-700', color)}
+                style={{ height: `${pct}%` }}
+              />
+            </div>
+            <span className="text-xs text-foreground-subtle">{d.label}</span>
+          </div>
+        )
+      })}
     </div>
   )
 }
 
+// ── Fallback helper ──────────────────────────────────────────────────
+
+function localWithFallback<T>(fn: (id: string) => T[], restaurantId: string): T[] {
+  const result = fn(restaurantId)
+  if (Array.isArray(result) && result.length > 0) return result
+  return fn('rest-1')
+}
+
+// ── Component ────────────────────────────────────────────────────────
+
 export default function DashboardAnalyticsPage() {
-  const { restaurantId } = useRestaurant()
+  const { restaurantId, loading: restaurantLoading } = useRestaurant()
   const [reservations, setReservations] = useState<Reservation[]>([])
   const [orders, setOrders] = useState<Order[]>([])
+  const [sessions, setSessions] = useState<TableSession[]>([])
+  const [tables, setTables] = useState<Table[]>([])
+  const [waiters, setWaiters] = useState<User[]>([])
+  const [loading, setLoading] = useState(true)
   const [period, setPeriod] = useState<'7d' | '30d' | '90d'>('30d')
 
-  useEffect(() => {
+  const loadData = useCallback(async () => {
     if (!restaurantId) return
-    async function load() {
-      if (isSupabaseConfigured()) {
-        setReservations(await sbGetReservationsForRestaurant(restaurantId))
-        setOrders(await sbGetOrdersForRestaurant(restaurantId))
+    const sb = isSupabaseConfigured()
+    try {
+      if (sb) {
+        const [sbRes, sbOrd, sbSess, sbTbl, sbWait] = await Promise.all([
+          sbGetReservationsForRestaurant(restaurantId).catch(() => []),
+          sbGetOrdersForRestaurant(restaurantId).catch(() => []),
+          sbGetSessionsForRestaurant(restaurantId).catch(() => []),
+          sbGetTablesForRestaurant(restaurantId).catch(() => []),
+          sbGetCamarerosForRestaurant(restaurantId).catch(() => []),
+        ])
+        const localRes = localWithFallback(getReservationsForRestaurant, restaurantId)
+        const localOrd = localWithFallback(getOrdersForRestaurant, restaurantId)
+        const localSess = localWithFallback(getSessionsForRestaurant, restaurantId)
+        const localTbl = localWithFallback(getTablesForRestaurant, restaurantId)
+        const localWait = localWithFallback(getCamarerosForRestaurant, restaurantId)
+
+        // Merge: Supabase first, then localStorage
+        const merge = <T extends { id: string }>(sb: T[], local: T[]) => {
+          const ids = new Set(sb.map((x) => x.id))
+          return [...sb, ...local.filter((x) => !ids.has(x.id))]
+        }
+        setReservations(merge(sbRes, localRes))
+        setOrders(merge(sbOrd, localOrd))
+        setSessions(merge(sbSess, localSess))
+        setTables(merge(sbTbl, localTbl))
+        setWaiters(merge(sbWait, localWait))
       } else {
-        setReservations(getReservationsForRestaurant(restaurantId))
-        setOrders(getOrdersForRestaurant(restaurantId))
+        setReservations(localWithFallback(getReservationsForRestaurant, restaurantId))
+        setOrders(localWithFallback(getOrdersForRestaurant, restaurantId))
+        setSessions(localWithFallback(getSessionsForRestaurant, restaurantId))
+        setTables(localWithFallback(getTablesForRestaurant, restaurantId))
+        setWaiters(localWithFallback(getCamarerosForRestaurant, restaurantId))
       }
+    } catch (e) {
+      console.error('Error loading analytics:', e)
     }
-    load()
+    setLoading(false)
   }, [restaurantId])
 
-  // Summary metrics
-  const total = reservations.length
-  const confirmed = reservations.filter((r) => r.status === 'confirmed').length
-  const cancelled = reservations.filter((r) => r.status === 'cancelled').length
-  const noShow = reservations.filter((r) => r.status === 'no_show').length
-  const pending = reservations.filter((r) => r.status === 'pending').length
-  const avgPartySize = total === 0 ? 0 : (reservations.reduce((s, r) => s + r.partySize, 0) / total).toFixed(1)
-  const confirmedRate = total === 0 ? 0 : Math.round((confirmed / total) * 100)
-  const cancelRate = total === 0 ? 0 : Math.round((cancelled / total) * 100)
+  usePolling(loadData, 60000, !!restaurantId)
 
-  // Mock weekly data
-  const weeklyData = DAYS.map((day, i) => ({
-    day,
-    reservations: [3, 2, 4, 5, 8, 12, 9][i],
-    capacity: 15,
-  }))
-  const maxWeekly = Math.max(...weeklyData.map((d) => d.reservations))
+  // ── Period filtering ───────────────────────────────────────────────
 
-  // Mock hourly data
-  const hourlyData = [
-    { hour: '13h', count: 8 },
-    { hour: '14h', count: 12 },
-    { hour: '15h', count: 6 },
-    { hour: '20h', count: 4 },
-    { hour: '21h', count: 14 },
-    { hour: '22h', count: 10 },
-    { hour: '23h', count: 5 },
-  ]
-  const maxHourly = Math.max(...hourlyData.map((h) => h.count))
+  const days = periodDays(period)
+  const filteredOrders = orders.filter((o) => isWithinPeriod(o.createdAt, days))
+  const filteredSessions = sessions.filter((s) => s.closedAt && isWithinPeriod(s.closedAt, days))
+  const filteredReservations = reservations.filter((r) => isWithinPeriod(r.date, days))
 
-  // Customer origin (mock)
-  const origins = [
-    { label: 'Web directa', value: 45, color: 'bg-accent' },
-    { label: 'Google', value: 28, color: 'bg-accent-soft' },
-    { label: 'WhatsApp', value: 17, color: 'bg-success' },
-    { label: 'Otros', value: 10, color: 'bg-foreground-subtle' },
-  ]
+  // ── KPI calculations ──────────────────────────────────────────────
 
-  // TPV metrics
-  const completedOrders = orders.filter((o) => o.status === 'served' || o.status === 'paid')
   const orderTotal = (o: Order) => o.items.reduce((s, i) => s + i.price * i.quantity, 0)
+  const completedOrders = filteredOrders.filter((o) => o.status === 'served' || o.status === 'paid')
   const totalRevenue = completedOrders.reduce((s, o) => s + orderTotal(o), 0)
-  const avgTicket = completedOrders.length === 0 ? 0 : totalRevenue / completedOrders.length
+  const avgTicket = completedOrders.length > 0 ? totalRevenue / completedOrders.length : 0
+  const closedSessionCount = filteredSessions.length
+  const avgSessionRevenue = closedSessionCount > 0
+    ? filteredSessions.reduce((s, sess) => s + sess.totalAmount, 0) / closedSessionCount
+    : 0
 
-  // Popular dishes (aggregate items across all orders)
+  // Reservation metrics
+  const totalRes = filteredReservations.length
+  const confirmed = filteredReservations.filter((r) => r.status === 'confirmed').length
+  const cancelled = filteredReservations.filter((r) => r.status === 'cancelled').length
+  const noShow = filteredReservations.filter((r) => r.status === 'no_show').length
+  const pendingRes = filteredReservations.filter((r) => r.status === 'pending').length
+  const confirmedRate = totalRes > 0 ? Math.round((confirmed / totalRes) * 100) : 0
+  const cancelRate = totalRes > 0 ? Math.round((cancelled / totalRes) * 100) : 0
+
+  // ── Pedidos por día de la semana (real data) ──────────────────────
+
+  const ordersByDow = new Array(7).fill(0)
+  filteredOrders.forEach((o) => {
+    const dow = new Date(o.createdAt).getDay()
+    // JS: 0=Sun, convert to Mon=0
+    ordersByDow[(dow + 6) % 7]++
+  })
+  const weeklyData = DAYS.map((day, i) => ({ label: day, value: ordersByDow[i] }))
+
+  // ── Pedidos por hora (real data) ──────────────────────────────────
+
+  const ordersByHour = new Map<number, number>()
+  filteredOrders.forEach((o) => {
+    const h = new Date(o.createdAt).getHours()
+    ordersByHour.set(h, (ordersByHour.get(h) ?? 0) + 1)
+  })
+  const hourlySlots = [12, 13, 14, 15, 16, 19, 20, 21, 22, 23]
+  const hourlyData = hourlySlots
+    .map((h) => ({ label: `${h}h`, value: ordersByHour.get(h) ?? 0 }))
+    .filter((h) => h.value > 0 || hourlySlots.indexOf(parseInt(h.label)) >= 0)
+
+  // ── Platos más vendidos (real data) ───────────────────────────────
+
   const dishMap = new Map<string, { name: string; qty: number; revenue: number }>()
-  orders.forEach((o) =>
+  filteredOrders.forEach((o) =>
     o.items.forEach((item) => {
       const existing = dishMap.get(item.menuItemId)
       if (existing) {
@@ -118,10 +206,11 @@ export default function DashboardAnalyticsPage() {
       }
     }),
   )
-  const topDishes = [...dishMap.values()].sort((a, b) => b.qty - a.qty).slice(0, 5)
+  const topDishes = [...dishMap.values()].sort((a, b) => b.qty - a.qty).slice(0, 6)
   const maxDishQty = Math.max(...topDishes.map((d) => d.qty), 1)
 
-  // Revenue per day
+  // ── Ingresos por día (real data) ──────────────────────────────────
+
   const revenueByDay = new Map<string, number>()
   completedOrders.forEach((o) => {
     const day = o.createdAt.slice(0, 10)
@@ -130,200 +219,249 @@ export default function DashboardAnalyticsPage() {
   const revenueDays = [...revenueByDay.entries()]
     .sort((a, b) => a[0].localeCompare(b[0]))
     .slice(-7)
-  const maxDayRevenue = Math.max(...revenueDays.map((d) => d[1]), 1)
 
+  // ── Rendimiento por mesa ──────────────────────────────────────────
+
+  const tableRevMap = new Map<string, { name: string; sessions: number; revenue: number }>()
+  const tableMap = new Map(tables.map((t) => [t.id, t]))
+  filteredSessions.forEach((s) => {
+    const table = tableMap.get(s.tableId)
+    const name = table?.name ?? s.tableId
+    const existing = tableRevMap.get(s.tableId)
+    if (existing) {
+      existing.sessions++
+      existing.revenue += s.totalAmount
+    } else {
+      tableRevMap.set(s.tableId, { name, sessions: 1, revenue: s.totalAmount })
+    }
+  })
+  const topTables = [...tableRevMap.values()].sort((a, b) => b.revenue - a.revenue).slice(0, 5)
+  const maxTableRev = Math.max(...topTables.map((t) => t.revenue), 1)
+
+  // ── Rendimiento por camarero ──────────────────────────────────────
+
+  const waiterMap = new Map(waiters.map((w) => [w.id, w]))
+  const waiterRevMap = new Map<string, { name: string; sessions: number; revenue: number }>()
+  filteredSessions.forEach((s) => {
+    if (!s.waiterId) return
+    const waiter = waiterMap.get(s.waiterId)
+    const name = waiter?.name ?? 'Desconocido'
+    const existing = waiterRevMap.get(s.waiterId)
+    if (existing) {
+      existing.sessions++
+      existing.revenue += s.totalAmount
+    } else {
+      waiterRevMap.set(s.waiterId, { name, sessions: 1, revenue: s.totalAmount })
+    }
+  })
+  const topWaiters = [...waiterRevMap.values()].sort((a, b) => b.revenue - a.revenue)
+
+  // ── KPIs array ────────────────────────────────────────────────────
+
+  const periodLabel = period === '7d' ? '7 días' : period === '30d' ? '30 días' : '90 días'
   const kpis = [
-    { label: 'Total reservas', value: total, sub: period, color: 'text-accent' },
-    { label: 'Confirmadas', value: `${confirmedRate}%`, sub: `${confirmed} reservas`, color: 'text-success' },
-    { label: 'Canceladas', value: `${cancelRate}%`, sub: `${cancelled} reservas`, color: 'text-red-400' },
-    { label: 'Ingresos totales', value: `${totalRevenue.toFixed(0)}€`, sub: `${completedOrders.length} pedidos`, color: 'text-accent' },
-    { label: 'Ticket medio', value: `${avgTicket.toFixed(1)}€`, sub: 'por pedido', color: 'text-accent-soft' },
-    { label: 'Pax promedio', value: avgPartySize, sub: 'por reserva', color: 'text-foreground' },
+    { label: 'Ingresos', value: formatCurrency(totalRevenue), sub: `${completedOrders.length} pedidos`, color: 'text-green-400' },
+    { label: 'Sesiones', value: closedSessionCount, sub: periodLabel, color: 'text-accent' },
+    { label: 'Ticket medio', value: formatCurrency(avgTicket), sub: 'por pedido', color: 'text-accent-soft' },
+    { label: 'Media/sesión', value: formatCurrency(avgSessionRevenue), sub: 'ingreso medio', color: 'text-accent' },
+    { label: 'Reservas', value: totalRes, sub: `${confirmedRate}% confirmadas`, color: 'text-blue-400' },
+    { label: 'Cancelación', value: `${cancelRate}%`, sub: `${cancelled} canceladas`, color: 'text-red-400' },
   ]
 
-  return (
-    <div className="space-y-8">
-      {/* Header */}
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-semibold text-foreground">Analíticas</h1>
-          <p className="mt-1 text-sm">Métricas de ocupación, comportamiento y rendimiento</p>
+  // ── Render ────────────────────────────────────────────────────────
+
+  if (loading || restaurantLoading) {
+    return (
+      <PageTransition>
+        <div className="flex items-center justify-center py-20">
+          <div className="h-8 w-8 animate-spin rounded-full border-2 border-accent border-t-transparent" />
+          <span className="ml-3 text-foreground-subtle">Cargando analíticas...</span>
         </div>
-        <div className="flex gap-1 rounded-lg border border-border-subtle bg-background-elevated p-1">
-          {(['7d', '30d', '90d'] as const).map((p) => (
-            <button
-              key={p}
-              onClick={() => setPeriod(p)}
-              className={clsx('rounded px-3 py-1 text-xs font-medium transition', period === p ? 'bg-accent text-background' : 'text-foreground-subtle hover:text-foreground')}
-            >
-              {p === '7d' ? '7 días' : p === '30d' ? '30 días' : '90 días'}
-            </button>
+      </PageTransition>
+    )
+  }
+
+  return (
+    <PageTransition>
+      <div className="space-y-8">
+        {/* Header */}
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h1 className="text-2xl font-bold">Analíticas</h1>
+            <p className="mt-1 text-sm text-foreground-subtle">Métricas de rendimiento, ventas y ocupación</p>
+          </div>
+          <div className="flex gap-1 rounded-lg border border-border-subtle bg-background-elevated p-1">
+            {(['7d', '30d', '90d'] as const).map((p) => (
+              <button
+                key={p}
+                onClick={() => setPeriod(p)}
+                className={clsx(
+                  'rounded px-3 py-1.5 text-xs font-medium transition',
+                  period === p ? 'bg-accent text-white' : 'text-foreground-subtle hover:text-foreground',
+                )}
+              >
+                {p === '7d' ? '7 días' : p === '30d' ? '30 días' : '90 días'}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* KPIs */}
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+          {kpis.map((k) => (
+            <div key={k.label} className="card p-4">
+              <p className="text-xs text-foreground-subtle">{k.label}</p>
+              <p className={clsx('mt-1 text-2xl font-bold', k.color)}>{k.value}</p>
+              <p className="mt-0.5 text-[10px] text-foreground-subtle/70">{k.sub}</p>
+            </div>
           ))}
         </div>
-      </div>
 
-      {/* KPIs */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
-        {kpis.map((k) => (
-          <div key={k.label} className="card">
-            <p className="text-xs text-foreground-subtle">{k.label}</p>
-            <p className={clsx('mt-1 text-3xl font-bold', k.color)}>{k.value}</p>
-            <p className="mt-1 text-xs text-foreground-subtle">{k.sub}</p>
-          </div>
-        ))}
-      </div>
-
-      {/* Weekly occupancy chart */}
-      <div className="card">
-        <h2 className="mb-5 text-base font-semibold text-foreground">Reservas por día de la semana</h2>
-        <div className="flex items-end justify-between gap-2">
-          {weeklyData.map((d) => {
-            const pct = maxWeekly === 0 ? 0 : (d.reservations / maxWeekly) * 100
-            return (
-              <div key={d.day} className="flex flex-1 flex-col items-center gap-1">
-                <span className="text-xs font-medium text-foreground">{d.reservations}</span>
-                <div className="relative w-full rounded bg-border-subtle" style={{ height: '100px' }}>
-                  <div
-                    className="absolute bottom-0 w-full rounded bg-accent/80 transition-all duration-700"
-                    style={{ height: `${pct}%` }}
-                  />
-                </div>
-                <span className="text-xs text-foreground-subtle">{d.day}</span>
-              </div>
-            )
-          })}
-        </div>
-        <p className="mt-4 text-xs text-foreground-subtle">Sábado y domingo tienen mayor ocupación.</p>
-      </div>
-
-      {/* 2-col grid: hourly + status */}
-      <div className="grid gap-6 lg:grid-cols-2">
-        {/* Hourly distribution */}
+        {/* Revenue per day chart */}
         <div className="card">
-          <h2 className="mb-5 text-base font-semibold text-foreground">Franja horaria más demandada</h2>
-          <div className="flex items-end gap-2">
-            {hourlyData.map((h) => (
-              <HourBar key={h.hour} hour={h.hour} count={h.count} max={maxHourly} />
-            ))}
-          </div>
-          <p className="mt-4 text-xs text-foreground-subtle">Las 21h es la hora más solicitada.</p>
-        </div>
-
-        {/* Status breakdown */}
-        <div className="card">
-          <h2 className="mb-5 text-base font-semibold text-foreground">Desglose por estado</h2>
-          <div className="space-y-4">
-            <StatBar label="Confirmadas" value={confirmed} max={total} color="bg-success" />
-            <StatBar label="Pendientes" value={pending} max={total} color="bg-yellow-400" />
-            <StatBar label="Canceladas" value={cancelled} max={total} color="bg-red-400" />
-            <StatBar label="No-show" value={noShow} max={total} color="bg-foreground-subtle" />
-          </div>
-        </div>
-      </div>
-
-      {/* TPV: Top dishes + Revenue per day */}
-      <div className="grid gap-6 lg:grid-cols-2">
-        {/* Popular dishes */}
-        <div className="card">
-          <h2 className="mb-5 text-base font-semibold text-foreground">Platos más vendidos</h2>
-          {topDishes.length === 0 ? (
-            <p className="text-sm text-foreground-subtle">No hay datos de pedidos aún.</p>
+          <h2 className="mb-5 text-base font-semibold">Ingresos por día</h2>
+          {revenueDays.length === 0 ? (
+            <p className="text-sm text-foreground-subtle">No hay datos de ingresos en este período.</p>
           ) : (
-            <div className="space-y-3">
-              {topDishes.map((dish, i) => (
-                <div key={dish.name} className="space-y-1">
-                  <div className="flex justify-between text-xs">
-                    <span className="text-foreground">
-                      <span className="text-foreground-subtle mr-1">{i + 1}.</span>
-                      {dish.name}
-                    </span>
-                    <span className="font-medium text-foreground">{dish.qty} uds · {dish.revenue.toFixed(0)}€</span>
-                  </div>
-                  <div className="h-2 rounded-full bg-border-subtle">
-                    <div
-                      className="h-2 rounded-full bg-accent transition-all duration-700"
-                      style={{ width: `${(dish.qty / maxDishQty) * 100}%` }}
-                    />
-                  </div>
-                </div>
-              ))}
-            </div>
+            <BarChart
+              data={revenueDays.map(([day, revenue]) => ({
+                label: new Date(day + 'T12:00:00').toLocaleDateString('es-ES', { weekday: 'short', day: 'numeric' }),
+                value: revenue,
+                sub: `${revenue.toFixed(0)}€`,
+              }))}
+              color="bg-green-500/70"
+            />
           )}
         </div>
 
-        {/* Revenue per day */}
-        <div className="card">
-          <h2 className="mb-5 text-base font-semibold text-foreground">Ingresos por día</h2>
-          {revenueDays.length === 0 ? (
-            <p className="text-sm text-foreground-subtle">No hay datos de pedidos aún.</p>
-          ) : (
-            <div className="flex items-end justify-between gap-2">
-              {revenueDays.map(([day, revenue]) => {
-                const pct = (revenue / maxDayRevenue) * 100
-                const shortDay = new Date(day + 'T12:00:00').toLocaleDateString('es-ES', { weekday: 'short' })
-                return (
-                  <div key={day} className="flex flex-1 flex-col items-center gap-1">
-                    <span className="text-xs font-medium text-foreground">{revenue.toFixed(0)}€</span>
-                    <div className="relative w-full rounded bg-border-subtle" style={{ height: '100px' }}>
+        {/* 2-col: Orders by weekday + Orders by hour */}
+        <div className="grid gap-6 lg:grid-cols-2">
+          <div className="card">
+            <h2 className="mb-5 text-base font-semibold">Pedidos por día de la semana</h2>
+            <BarChart data={weeklyData} color="bg-accent/80" />
+          </div>
+          <div className="card">
+            <h2 className="mb-5 text-base font-semibold">Pedidos por hora</h2>
+            {hourlyData.every((h) => h.value === 0) ? (
+              <p className="text-sm text-foreground-subtle">No hay datos en este período.</p>
+            ) : (
+              <BarChart data={hourlyData} color="bg-accent/70" />
+            )}
+          </div>
+        </div>
+
+        {/* 2-col: Top dishes + Top tables */}
+        <div className="grid gap-6 lg:grid-cols-2">
+          {/* Popular dishes */}
+          <div className="card">
+            <h2 className="mb-5 text-base font-semibold">Platos más vendidos</h2>
+            {topDishes.length === 0 ? (
+              <p className="text-sm text-foreground-subtle">No hay datos de pedidos aún.</p>
+            ) : (
+              <div className="space-y-3">
+                {topDishes.map((dish, i) => (
+                  <div key={dish.name} className="space-y-1">
+                    <div className="flex justify-between text-xs">
+                      <span className="text-foreground">
+                        <span className="text-foreground-subtle mr-1">{i + 1}.</span>
+                        {dish.name}
+                      </span>
+                      <span className="font-medium text-foreground">{dish.qty} uds · {dish.revenue.toFixed(0)}€</span>
+                    </div>
+                    <div className="h-2 rounded-full bg-border-subtle">
                       <div
-                        className="absolute bottom-0 w-full rounded bg-success/70 transition-all duration-700"
-                        style={{ height: `${pct}%` }}
+                        className="h-2 rounded-full bg-accent transition-all duration-700"
+                        style={{ width: `${(dish.qty / maxDishQty) * 100}%` }}
                       />
                     </div>
-                    <span className="text-xs text-foreground-subtle capitalize">{shortDay}</span>
                   </div>
-                )
-              })}
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* Customer origin + top table */}
-      <div className="grid gap-6 lg:grid-cols-2">
-        {/* Origin */}
-        <div className="card">
-          <h2 className="mb-5 text-base font-semibold text-foreground">Origen de las reservas</h2>
-          <div className="space-y-3">
-            {origins.map((o) => (
-              <div key={o.label} className="space-y-1">
-                <div className="flex justify-between text-xs">
-                  <span className="text-foreground-subtle">{o.label}</span>
-                  <span className="font-medium text-foreground">{o.value}%</span>
-                </div>
-                <div className="h-2 rounded-full bg-border-subtle">
-                  <div className={clsx('h-2 rounded-full transition-all duration-700', o.color)} style={{ width: `${o.value}%` }} />
-                </div>
+                ))}
               </div>
-            ))}
+            )}
+          </div>
+
+          {/* Top tables */}
+          <div className="card">
+            <h2 className="mb-5 text-base font-semibold">Rendimiento por mesa</h2>
+            {topTables.length === 0 ? (
+              <p className="text-sm text-foreground-subtle">No hay datos de sesiones aún.</p>
+            ) : (
+              <div className="space-y-3">
+                {topTables.map((table, i) => (
+                  <div key={table.name} className="space-y-1">
+                    <div className="flex justify-between text-xs">
+                      <span className="text-foreground">
+                        <span className="text-foreground-subtle mr-1">{i + 1}.</span>
+                        {table.name}
+                      </span>
+                      <span className="font-medium text-foreground">{table.sessions} sesiones · {formatCurrency(table.revenue)}</span>
+                    </div>
+                    <div className="h-2 rounded-full bg-border-subtle">
+                      <div
+                        className="h-2 rounded-full bg-blue-500 transition-all duration-700"
+                        style={{ width: `${(table.revenue / maxTableRev) * 100}%` }}
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
 
-        {/* Recent activity */}
-        <div className="card">
-          <h2 className="mb-5 text-base font-semibold text-foreground">Actividad reciente</h2>
-          <div className="space-y-3">
-            {reservations.slice(0, 4).map((r) => (
-              <div key={r.id} className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-foreground">{r.userName}</p>
-                  <p className="text-xs text-foreground-subtle">{r.date} · {r.time} · {r.partySize} pax</p>
-                </div>
-                <span
-                  className={clsx(
-                    'rounded-full border px-2 py-0.5 text-xs',
-                    r.status === 'confirmed' ? 'text-success bg-success/10 border-success/20' :
-                    r.status === 'pending' ? 'text-yellow-400 bg-yellow-400/10 border-yellow-400/20' :
-                    'text-red-400 bg-red-400/10 border-red-400/20',
-                  )}
-                >
-                  {r.status === 'confirmed' ? 'Confirmada' : r.status === 'pending' ? 'Pendiente' : 'Cancelada'}
-                </span>
+        {/* 2-col: Waiter performance + Reservation status */}
+        <div className="grid gap-6 lg:grid-cols-2">
+          {/* Waiter performance */}
+          <div className="card">
+            <h2 className="mb-5 text-base font-semibold">Rendimiento por camarero</h2>
+            {topWaiters.length === 0 ? (
+              <p className="text-sm text-foreground-subtle">No hay datos de camareros asignados.</p>
+            ) : (
+              <div className="space-y-3">
+                {topWaiters.map((w, i) => {
+                  const maxWaiterRev = Math.max(...topWaiters.map((x) => x.revenue), 1)
+                  return (
+                    <div key={w.name} className="space-y-1">
+                      <div className="flex justify-between text-xs">
+                        <span className="text-foreground">
+                          <span className="text-foreground-subtle mr-1">{i + 1}.</span>
+                          {w.name}
+                        </span>
+                        <span className="font-medium text-foreground">{w.sessions} sesiones · {formatCurrency(w.revenue)}</span>
+                      </div>
+                      <div className="h-2 rounded-full bg-border-subtle">
+                        <div
+                          className="h-2 rounded-full bg-purple-500 transition-all duration-700"
+                          style={{ width: `${(w.revenue / maxWaiterRev) * 100}%` }}
+                        />
+                      </div>
+                    </div>
+                  )
+                })}
               </div>
-            ))}
+            )}
+          </div>
+
+          {/* Reservation status breakdown */}
+          <div className="card">
+            <h2 className="mb-5 text-base font-semibold">Estado de reservas</h2>
+            {totalRes === 0 ? (
+              <p className="text-sm text-foreground-subtle">No hay reservas en este período.</p>
+            ) : (
+              <div className="space-y-4">
+                <StatBar label="Confirmadas" value={confirmed} max={totalRes} color="bg-success" />
+                <StatBar label="Pendientes" value={pendingRes} max={totalRes} color="bg-yellow-400" />
+                <StatBar label="Canceladas" value={cancelled} max={totalRes} color="bg-red-400" />
+                <StatBar label="No-show" value={noShow} max={totalRes} color="bg-foreground-subtle" />
+                <div className="flex items-center justify-between border-t border-border-subtle pt-3">
+                  <span className="text-xs text-foreground-subtle">Total</span>
+                  <span className="text-sm font-bold text-accent">{totalRes} reservas</span>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>
-    </div>
+    </PageTransition>
   )
 }

@@ -123,6 +123,8 @@ export interface Review {
   createdAt: string
   response?: string
   respondedAt?: string
+  verified?: boolean
+  reservationId?: string
 }
 
 export interface WaiterRotationState {

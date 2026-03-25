@@ -1,9 +1,19 @@
-import type { Metadata } from 'next'
+import type { Metadata, Viewport } from 'next'
 import { AuthProvider } from '@/components/providers/auth-provider'
 import { ToastProvider } from '@/components/ui/toast'
 import { GlobalNav, GlobalFooter } from '@/components/global-nav'
 import { MobileBottomNav } from '@/components/mobile-bottom-nav'
+import { ServiceWorkerRegister } from '@/components/pwa/sw-register'
+import { InstallPrompt } from '@/components/pwa/install-prompt'
 import './../styles/globals.css'
+
+export const viewport: Viewport = {
+  themeColor: '#F97316',
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
+}
 
 export const metadata: Metadata = {
   title: 'DineFirst · Gestiona restaurantes de forma más inteligente',
@@ -36,6 +46,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
           rel="stylesheet"
         />
+        <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+        <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+        <meta name="apple-mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
       </head>
       <body className="bg-background text-foreground font-sans antialiased">
         <AuthProvider>
@@ -45,7 +59,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               <main className="flex-1">{children}</main>
               <GlobalFooter />
               <MobileBottomNav />
+              <InstallPrompt />
             </div>
+            <ServiceWorkerRegister />
           </ToastProvider>
         </AuthProvider>
       </body>

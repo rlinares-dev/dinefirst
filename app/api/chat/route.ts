@@ -2,7 +2,25 @@ import { NextRequest } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { buildRestaurantContext } from '@/lib/chat-context'
 
-const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY
+// ─── AI Provider Configuration ───────────────────────────────────────
+// ACTUAL: Groq (gratis, quota propia, sin tarjeta)
+//   - API key de console.groq.com → API Keys
+//   - Modelo: llama-3.3-70b-versatile (70B params, excelente español)
+//   - 30 RPM, 14,400 req/día, 6,000 tokens/min — quota propia (no compartida)
+//   - API compatible OpenAI — solo cambia la URL base
+//
+// ALTERNATIVA: OpenRouter (gratis, quota compartida — puede dar 429)
+//   - API key de openrouter.ai/settings/keys
+//   - Modelos :free — rate limits compartidos entre todos los usuarios
+//   - Cambiar GROQ_API_KEY → OPENROUTER_API_KEY, URL → openrouter.ai/api/v1
+//
+// FUTURO: Google Gemini / Vertex AI
+//   - Gemini gratis NO funciona en España/UE (quota 0 sin tarjeta)
+//   - Vertex AI para producción (GDPR, SLA 99.9%, ~$0.01/mes por restaurante)
+//   - Guía completa: docs/gemini-chat-implementation.md
+// ─────────────────────────────────────────────────────────────────────
+
+const GROQ_API_KEY = process.env.GROQ_API_KEY
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!
 
@@ -12,15 +30,15 @@ interface ChatMessage {
 }
 
 export async function POST(req: NextRequest) {
-  if (!OPENROUTER_API_KEY) {
-    return new Response(JSON.stringify({ error: 'Chat AI no configurado. Añade OPENROUTER_API_KEY.' }), {
+  if (!GROQ_API_KEY) {
+    return new Response(JSON.stringify({ error: 'Chat AI no configurado. Añade GROQ_API_KEY a .env.local' }), {
       status: 503,
       headers: { 'Content-Type': 'application/json' },
     })
   }
 
   const body = await req.json()
-  const { messages, restaurantId, userId } = body as {
+  const { messages, restaurantId } = body as {
     messages: ChatMessage[]
     restaurantId: string
     userId: string
@@ -78,46 +96,55 @@ INSTRUCCIONES:
 
   const fullMessages: ChatMessage[] = [
     { role: 'system', content: systemPrompt },
-    ...messages.slice(-20), // Keep last 20 messages for context window
+    ...messages.slice(-20),
   ]
 
-  // Stream response from OpenRouter
-  const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${OPENROUTER_API_KEY}`,
-      'Content-Type': 'application/json',
-      'HTTP-Referer': process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000',
-      'X-Title': 'DineFirst',
-    },
-    body: JSON.stringify({
-      model: 'anthropic/claude-sonnet-4',
-      messages: fullMessages,
-      stream: true,
-      max_tokens: 1024,
-    }),
-  })
+  // Groq API (OpenAI-compatible)
+  try {
+    const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${GROQ_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'llama-3.3-70b-versatile',
+        messages: fullMessages,
+        stream: true,
+        max_tokens: 1024,
+      }),
+    })
 
-  if (!response.ok) {
-    const errorText = await response.text()
-    console.error('OpenRouter error:', response.status, errorText)
-    const errorMsg = response.status === 402
-      ? 'Sin créditos en OpenRouter. Recarga en openrouter.ai/settings/credits'
-      : 'Error al contactar el servicio AI'
-    return new Response(JSON.stringify({ error: errorMsg }), {
+    if (!response.ok) {
+      const errorText = await response.text()
+      console.error('Groq error:', response.status, errorText)
+      let errorMsg = 'Error al contactar el servicio AI'
+      if (response.status === 429) {
+        errorMsg = 'Límite de peticiones alcanzado. Inténtalo en unos segundos.'
+      } else if (response.status === 401) {
+        errorMsg = 'GROQ_API_KEY inválida. Verifica en console.groq.com'
+      }
+      return new Response(JSON.stringify({ error: errorMsg, retryable: response.status === 429 }), {
+        status: response.status === 429 ? 429 : 502,
+        headers: { 'Content-Type': 'application/json' },
+      })
+    }
+
+    // Forward the SSE stream (Groq uses OpenAI-compatible SSE format)
+    return new Response(response.body, {
+      headers: {
+        'Content-Type': 'text/event-stream',
+        'Cache-Control': 'no-cache',
+        'Connection': 'keep-alive',
+      },
+    })
+  } catch (e) {
+    console.error('Groq connection error:', e)
+    return new Response(JSON.stringify({ error: 'Error de conexión con el servicio AI' }), {
       status: 502,
       headers: { 'Content-Type': 'application/json' },
     })
   }
-
-  // Forward the SSE stream
-  return new Response(response.body, {
-    headers: {
-      'Content-Type': 'text/event-stream',
-      'Cache-Control': 'no-cache',
-      'Connection': 'keep-alive',
-    },
-  })
 }
 
 export async function GET() {

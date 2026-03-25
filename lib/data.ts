@@ -290,6 +290,27 @@ export function recalculateRestaurantRating(restaurantId: string): void {
   })
 }
 
+/**
+ * Check if a user can leave a verified review for a restaurant.
+ * Returns the reservationId if a confirmed/completed reservation exists
+ * that hasn't been reviewed yet.
+ */
+export function getVerifiableReservation(userId: string, restaurantId: string): string | null {
+  const reservations = getReservationsForUser(userId)
+    .filter((r) => r.restaurantId === restaurantId && r.status === 'confirmed')
+  const reviews = getReviewsForRestaurant(restaurantId)
+  const reviewedReservationIds = new Set(reviews.filter((r) => r.reservationId).map((r) => r.reservationId))
+  const unreviewedReservation = reservations.find((r) => !reviewedReservationIds.has(r.id))
+  return unreviewedReservation?.id ?? null
+}
+
+/**
+ * Check if a user already reviewed a specific restaurant (any review, verified or not).
+ */
+export function hasUserReviewedRestaurant(userId: string, restaurantId: string): boolean {
+  return getReviewsForRestaurant(restaurantId).some((r) => r.userId === userId)
+}
+
 // ─── Table Status ────────────────────────────────────────────────────────────
 
 export function getTablesByStatus(restaurantId: string, status: TableStatus): Table[] {
