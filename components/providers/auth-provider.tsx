@@ -57,6 +57,8 @@ function syncUserToLocalStorage(user: User | null) {
     const { setUser: saveUser, clearUser } = require('@/lib/data')
     if (user) saveUser(user)
     else clearUser()
+    // Notify other components (like GlobalNav) to re-read user
+    window.dispatchEvent(new CustomEvent('df-auth-change'))
   } catch {
     // ignore
   }

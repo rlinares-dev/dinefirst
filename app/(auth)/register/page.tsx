@@ -1,14 +1,26 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import clsx from 'clsx'
 import { useAuth } from '@/components/providers/auth-provider'
 import { isSupabaseConfigured } from '@/lib/env'
 import { emailWelcome } from '@/lib/email-client'
+import { getUser as getLocalUser } from '@/lib/data'
 import type { Role } from '@/types/database'
 
 export default function RegisterPage() {
-  const { signUp, signInWithGoogle } = useAuth()
+  const { signUp, signInWithGoogle, user } = useAuth()
+
+  // Redirect if already logged in
+  useEffect(() => {
+    const u = user ?? getLocalUser()
+    if (u) {
+      if (u.role === 'admin') window.location.href = '/admin'
+      else if (u.role === 'restaurante') window.location.href = '/dashboard'
+      else if (u.role === 'camarero') window.location.href = '/dashboard/tpv'
+      else window.location.href = '/app'
+    }
+  }, [user])
   const [step, setStep] = useState<1 | 2>(1)
   const [role, setRole] = useState<Role>('comensal')
   const [name, setName] = useState('')
