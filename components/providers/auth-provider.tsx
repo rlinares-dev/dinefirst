@@ -49,9 +49,28 @@ function profileToUser(profile: {
   }
 }
 
+// Sincroniza el user a localStorage para que `lib/data.getUser()` funcione
+// en páginas que leen directamente sin usar el context (dashboard layout, etc.)
+function syncUserToLocalStorage(user: User | null) {
+  if (typeof window === 'undefined') return
+  try {
+    const { setUser: saveUser, clearUser } = require('@/lib/data')
+    if (user) saveUser(user)
+    else clearUser()
+  } catch {
+    // ignore
+  }
+}
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<User | null>(null)
+  const [user, setUserState] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
+
+  // Wrapper que sincroniza React state + localStorage
+  const setUser = useCallback((u: User | null) => {
+    setUserState(u)
+    syncUserToLocalStorage(u)
+  }, [])
 
   // Inicializar auth
   useEffect(() => {

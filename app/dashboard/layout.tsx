@@ -42,6 +42,23 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     setCurrentUser(u)
   }, [])
 
+  // Re-check user when AuthProvider hydrates from Supabase (async)
+  useEffect(() => {
+    if (user) return
+    let attempts = 0
+    const interval = setInterval(() => {
+      const u = getUser()
+      if (u) {
+        setCurrentUser(u)
+        clearInterval(interval)
+      } else if (++attempts > 30) {
+        clearInterval(interval)
+        router.replace('/login')
+      }
+    }, 150)
+    return () => clearInterval(interval)
+  }, [user, router])
+
   useEffect(() => {
     if (!user) return
     if (user.role === 'comensal') {
