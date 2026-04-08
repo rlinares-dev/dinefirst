@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect } from 'react'
 import { motion, AnimatePresence, LayoutGroup, useMotionValue, useSpring, useTransform } from 'framer-motion'
 import { useAuth } from '@/components/providers/auth-provider'
 import { isSupabaseConfigured } from '@/lib/env'
@@ -41,20 +41,13 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false)
   const [tabDirection, setTabDirection] = useState(1)
   const [particles, setParticles] = useState<Particle[]>([])
-  const particleIdRef = useRef(0)
+  const [particleSeq, setParticleSeq] = useState(0)
 
-  // Magnetic button
-  const btnRef = useRef<HTMLButtonElement | null>(null)
-  const mouseX = useMotionValue(0)
-  const mouseY = useMotionValue(0)
-  const springX = useSpring(mouseX, { stiffness: 300, damping: 20 })
-  const springY = useSpring(mouseY, { stiffness: 300, damping: 20 })
-
-  // Tilt card based on global mouse position
+  // Tilt card based on global mouse position (subtle)
   const cardTiltX = useMotionValue(0)
   const cardTiltY = useMotionValue(0)
-  const cardRotX = useSpring(useTransform(cardTiltY, (v) => v * -4), { stiffness: 150, damping: 18 })
-  const cardRotY = useSpring(useTransform(cardTiltX, (v) => v * 4), { stiffness: 150, damping: 18 })
+  const cardRotX = useSpring(useTransform(cardTiltY, (v) => v * -2.5), { stiffness: 150, damping: 18 })
+  const cardRotY = useSpring(useTransform(cardTiltX, (v) => v * 2.5), { stiffness: 150, damping: 18 })
 
   useEffect(() => {
     const u = user ?? getUser()
@@ -84,23 +77,26 @@ export default function LoginPage() {
 
   function emitParticles(centerX: number, centerY: number, count = 14) {
     const colors = ['#F97316', '#FDBA74', '#FFEDD5', '#FCD34D']
-    const newParticles: Particle[] = Array.from({ length: count }, () => {
-      const angle = Math.random() * Math.PI * 2
-      const speed = Math.random() * 80 + 60
-      return {
-        id: particleIdRef.current++,
-        x: centerX,
-        y: centerY,
-        dx: Math.cos(angle) * speed,
-        dy: Math.sin(angle) * speed,
-        size: Math.random() * 5 + 3,
-        color: colors[Math.floor(Math.random() * colors.length)],
-      }
+    setParticleSeq((seq) => {
+      const newParticles: Particle[] = Array.from({ length: count }, (_, i) => {
+        const angle = Math.random() * Math.PI * 2
+        const speed = Math.random() * 80 + 60
+        return {
+          id: seq + i,
+          x: centerX,
+          y: centerY,
+          dx: Math.cos(angle) * speed,
+          dy: Math.sin(angle) * speed,
+          size: Math.random() * 4 + 2,
+          color: colors[Math.floor(Math.random() * colors.length)],
+        }
+      })
+      setParticles((prev) => [...prev, ...newParticles])
+      setTimeout(() => {
+        setParticles((prev) => prev.filter((p) => !newParticles.find((np) => np.id === p.id)))
+      }, 900)
+      return seq + count
     })
-    setParticles((prev) => [...prev, ...newParticles])
-    setTimeout(() => {
-      setParticles((prev) => prev.filter((p) => !newParticles.find((np) => np.id === p.id)))
-    }, 900)
   }
 
   function switchAccountType(next: AccountType, e: React.MouseEvent) {
@@ -151,19 +147,6 @@ export default function LoginPage() {
       const u = getUser()
       redirectByRole(u?.role)
     }, 100)
-  }
-
-  function handleBtnMouseMove(e: React.MouseEvent<HTMLButtonElement>) {
-    const rect = e.currentTarget.getBoundingClientRect()
-    const x = e.clientX - rect.left - rect.width / 2
-    const y = e.clientY - rect.top - rect.height / 2
-    mouseX.set(x * 0.3)
-    mouseY.set(y * 0.3)
-  }
-
-  function handleBtnMouseLeave() {
-    mouseX.set(0)
-    mouseY.set(0)
   }
 
   // Form variants — dramatic 3D flip
@@ -247,7 +230,7 @@ export default function LoginPage() {
         </AnimatePresence>
       </div>
 
-      <main className="relative min-h-screen flex items-center justify-center px-6 py-12">
+      <main className="relative z-10 min-h-screen flex items-center justify-center px-6 py-12">
         <motion.div
           initial={{ opacity: 0, y: 30, scale: 0.9 }}
           animate={{ opacity: 1, y: 0, scale: 1 }}
@@ -259,32 +242,29 @@ export default function LoginPage() {
           <div className="mb-6 flex justify-center">
             <motion.a
               href="/"
-              whileHover={{ scale: 1.12, rotate: -6 }}
-              whileTap={{ scale: 0.92 }}
+              whileHover={{ scale: 1.1, rotate: -4 }}
+              whileTap={{ scale: 0.94 }}
               initial={{ y: -20, opacity: 0 }}
               animate={{ y: 0, opacity: 1 }}
               transition={{ delay: 0.2, type: 'spring', stiffness: 300, damping: 20 }}
-              className="inline-flex h-14 w-14 items-center justify-center rounded-2xl bg-accent text-lg font-bold text-white shadow-[0_0_40px_rgba(249,115,22,0.6)]"
+              className="inline-flex h-12 w-12 items-center justify-center rounded-xl bg-accent text-base font-bold text-white"
             >
               DF
             </motion.a>
           </div>
 
-          {/* Card with rotating conic border */}
+          {/* Card with subtle border */}
           <motion.div
-            className="relative rounded-2xl p-[1.5px]"
+            className="relative rounded-2xl"
             style={{
               rotateX: cardRotX,
               rotateY: cardRotY,
               transformStyle: 'preserve-3d',
             }}
           >
-            {/* Animated conic gradient border */}
-            <div className="conic-border absolute inset-0 rounded-2xl opacity-80" />
-
             {/* Inner card */}
             <div
-              className="relative rounded-2xl bg-background-soft/90 p-6 backdrop-blur-xl shadow-[0_20px_60px_-15px_rgba(0,0,0,0.6)]"
+              className="relative rounded-2xl border border-white/10 bg-background-soft/80 p-6 backdrop-blur-xl shadow-[0_20px_60px_-20px_rgba(0,0,0,0.7)]"
               style={{ transformStyle: 'preserve-3d' }}
             >
               {/* Google OAuth */}
@@ -333,7 +313,7 @@ export default function LoginPage() {
                         {active && (
                           <motion.span
                             layoutId="auth-tab-pill"
-                            className="absolute inset-0 rounded-lg bg-accent shadow-[0_0_24px_rgba(249,115,22,0.5)]"
+                            className="absolute inset-0 rounded-lg bg-accent"
                             transition={{ type: 'spring', stiffness: 400, damping: 32 }}
                           />
                         )}
@@ -508,19 +488,19 @@ export default function LoginPage() {
                     )}
 
                     <motion.div variants={fieldVariants}>
-                      <motion.button
-                        ref={btnRef}
+                      <button
                         type="submit"
                         disabled={loading}
-                        onMouseMove={handleBtnMouseMove}
-                        onMouseLeave={handleBtnMouseLeave}
-                        style={{ x: springX, y: springY }}
-                        whileHover={{ scale: 1.02 }}
-                        whileTap={{ scale: 0.96 }}
-                        className="btn-primary w-full py-3 disabled:opacity-60 shadow-[0_0_30px_rgba(249,115,22,0.4)]"
+                        className="shine-btn group relative w-full overflow-hidden rounded-full bg-accent py-3 text-sm font-semibold text-white transition-all hover:bg-accent-strong disabled:opacity-60"
                       >
-                        {loading ? 'Iniciando sesión…' : 'Iniciar sesión'}
-                      </motion.button>
+                        <span className="relative z-10">
+                          {loading ? 'Iniciando sesión…' : 'Iniciar sesión'}
+                        </span>
+                        {/* Moving shine */}
+                        <span className="shine-sweep absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/30 to-transparent" />
+                        {/* Pulsing border on hover */}
+                        <span className="pointer-events-none absolute inset-0 rounded-full border border-white/20 opacity-0 transition-opacity group-hover:opacity-100" />
+                      </button>
                     </motion.div>
                   </motion.form>
                 </AnimatePresence>
@@ -545,32 +525,17 @@ export default function LoginPage() {
         </motion.div>
 
         <style jsx>{`
-          @keyframes spin-conic {
-            to {
-              transform: rotate(1turn);
+          @keyframes shine-sweep {
+            0% {
+              transform: translateX(-100%);
+            }
+            60%,
+            100% {
+              transform: translateX(200%);
             }
           }
-          .conic-border {
-            background: conic-gradient(
-              from 0deg,
-              transparent 0deg,
-              rgba(249, 115, 22, 0.8) 60deg,
-              rgba(253, 186, 116, 0.6) 120deg,
-              transparent 180deg,
-              transparent 270deg,
-              rgba(249, 115, 22, 0.4) 320deg,
-              transparent 360deg
-            );
-            animation: spin-conic 5s linear infinite;
-            mask:
-              linear-gradient(#000 0 0) content-box,
-              linear-gradient(#000 0 0);
-            -webkit-mask:
-              linear-gradient(#000 0 0) content-box,
-              linear-gradient(#000 0 0);
-            mask-composite: exclude;
-            -webkit-mask-composite: xor;
-            padding: 1.5px;
+          .shine-btn .shine-sweep {
+            animation: shine-sweep 2.8s ease-in-out infinite;
           }
         `}</style>
       </main>

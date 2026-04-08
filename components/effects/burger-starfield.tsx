@@ -57,12 +57,12 @@ export function BurgerStarfield() {
   }, [])
 
   return (
-    <div className="pointer-events-none fixed inset-0 -z-10 overflow-hidden bg-[#020617]">
+    <div className="pointer-events-none fixed inset-0 z-0 overflow-hidden">
       {/* Deep space gradient */}
-      <div className="absolute inset-0 bg-gradient-to-b from-[#050816] via-[#0a0a1a] to-[#020617]" />
+      <div className="absolute inset-0 bg-gradient-to-br from-[#0a0614] via-[#0d0816] to-[#04030a]" />
 
-      {/* Radial orange glow in center */}
-      <div className="absolute top-1/2 left-1/2 h-[800px] w-[800px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-accent/10 blur-[180px]" />
+      {/* Radial orange glow in center — very subtle */}
+      <div className="absolute top-1/2 left-1/2 h-[700px] w-[700px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-accent/[0.06] blur-[160px]" />
 
       {/* Static twinkling stars */}
       {stars.map((s, i) => (
