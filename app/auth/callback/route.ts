@@ -1,8 +1,18 @@
 import { NextResponse } from 'next/server'
 import { isSupabaseConfigured } from '@/lib/env'
 
+// Allow static export (Capacitor mobile build) — this route won't be used in static mode
+export const dynamic = 'force-static'
+
 export async function GET(request: Request) {
-  const { searchParams, origin } = new URL(request.url)
+  // In static export, request.url is not available — return basic redirect
+  let url: URL
+  try {
+    url = new URL(request.url)
+  } catch {
+    return NextResponse.json({ error: 'Auth callback requires server mode' })
+  }
+  const { searchParams, origin } = url
   const code = searchParams.get('code')
   const next = searchParams.get('next') ?? '/'
 

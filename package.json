@@ -33,9 +33,9 @@
     "*": "prettier --write --ignore-unknown"
   },
   "dependencies": {
-    "@capacitor/android": "^8.2.0",
-    "@capacitor/cli": "^8.2.0",
-    "@capacitor/core": "^8.2.0",
+    "@capacitor/android": "^8.3.0",
+    "@capacitor/cli": "^8.3.0",
+    "@capacitor/core": "^8.3.0",
     "@google/generative-ai": "^0.24.1",
     "@headlessui/react": "^1.7.17",
     "@heroicons/react": "^2.1.1",

@@ -15,14 +15,6 @@ const config: CapacitorConfig = {
       showSpinner: false,
     },
   },
-  android: {
-    buildOptions: {
-      keystorePath: undefined,
-      keystorePassword: undefined,
-      keystoreAlias: undefined,
-      keystoreAliasPassword: undefined,
-    },
-  },
 }
 
 export default config
