@@ -1,14 +1,25 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { motion, AnimatePresence, LayoutGroup } from 'framer-motion'
+import { useState, useEffect, useRef } from 'react'
+import { motion, AnimatePresence, LayoutGroup, useMotionValue, useSpring, useTransform } from 'framer-motion'
 import { useAuth } from '@/components/providers/auth-provider'
 import { isSupabaseConfigured } from '@/lib/env'
 import { getRestaurantSlugs, getUser } from '@/lib/data'
 import { sbGetRestaurantSlugs } from '@/lib/supabase-data'
+import { BurgerStarfield } from '@/components/effects/burger-starfield'
 
 type AccountType = 'comensal' | 'negocio'
 type BusinessRole = 'propietario' | 'empleado'
+
+interface Particle {
+  id: number
+  x: number
+  y: number
+  dx: number
+  dy: number
+  size: number
+  color: string
+}
 
 function redirectByRole(role: string | undefined) {
   if (role === 'admin') window.location.href = '/admin'
@@ -28,9 +39,23 @@ export default function LoginPage() {
   const [slugs, setSlugs] = useState<string[]>([])
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
-  const [tabDirection, setTabDirection] = useState(1) // for slide animation direction
+  const [tabDirection, setTabDirection] = useState(1)
+  const [particles, setParticles] = useState<Particle[]>([])
+  const particleIdRef = useRef(0)
 
-  // Redirect if already logged in
+  // Magnetic button
+  const btnRef = useRef<HTMLButtonElement | null>(null)
+  const mouseX = useMotionValue(0)
+  const mouseY = useMotionValue(0)
+  const springX = useSpring(mouseX, { stiffness: 300, damping: 20 })
+  const springY = useSpring(mouseY, { stiffness: 300, damping: 20 })
+
+  // Tilt card based on global mouse position
+  const cardTiltX = useMotionValue(0)
+  const cardTiltY = useMotionValue(0)
+  const cardRotX = useSpring(useTransform(cardTiltY, (v) => v * -4), { stiffness: 150, damping: 18 })
+  const cardRotY = useSpring(useTransform(cardTiltX, (v) => v * 4), { stiffness: 150, damping: 18 })
+
   useEffect(() => {
     const u = user ?? getUser()
     if (u) redirectByRole(u.role)
@@ -45,17 +70,54 @@ export default function LoginPage() {
     loadSlugs()
   }, [])
 
-  function switchAccountType(next: AccountType) {
+  // Global mouse tracking for card tilt
+  useEffect(() => {
+    function onMove(e: MouseEvent) {
+      const x = (e.clientX / window.innerWidth) * 2 - 1 // -1..1
+      const y = (e.clientY / window.innerHeight) * 2 - 1
+      cardTiltX.set(x)
+      cardTiltY.set(y)
+    }
+    window.addEventListener('mousemove', onMove)
+    return () => window.removeEventListener('mousemove', onMove)
+  }, [cardTiltX, cardTiltY])
+
+  function emitParticles(centerX: number, centerY: number, count = 14) {
+    const colors = ['#F97316', '#FDBA74', '#FFEDD5', '#FCD34D']
+    const newParticles: Particle[] = Array.from({ length: count }, () => {
+      const angle = Math.random() * Math.PI * 2
+      const speed = Math.random() * 80 + 60
+      return {
+        id: particleIdRef.current++,
+        x: centerX,
+        y: centerY,
+        dx: Math.cos(angle) * speed,
+        dy: Math.sin(angle) * speed,
+        size: Math.random() * 5 + 3,
+        color: colors[Math.floor(Math.random() * colors.length)],
+      }
+    })
+    setParticles((prev) => [...prev, ...newParticles])
+    setTimeout(() => {
+      setParticles((prev) => prev.filter((p) => !newParticles.find((np) => np.id === p.id)))
+    }, 900)
+  }
+
+  function switchAccountType(next: AccountType, e: React.MouseEvent) {
     if (next === accountType) return
     setTabDirection(next === 'negocio' ? 1 : -1)
     setAccountType(next)
     setError('')
+    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
+    emitParticles(rect.left + rect.width / 2, rect.top + rect.height / 2, 18)
   }
 
-  function switchBusinessRole(next: BusinessRole) {
+  function switchBusinessRole(next: BusinessRole, e: React.MouseEvent) {
     if (next === businessRole) return
     setBusinessRole(next)
     setError('')
+    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
+    emitParticles(rect.left + rect.width / 2, rect.top + rect.height / 2, 12)
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -91,332 +153,427 @@ export default function LoginPage() {
     }, 100)
   }
 
-  // Form variants for the "wow" animation
+  function handleBtnMouseMove(e: React.MouseEvent<HTMLButtonElement>) {
+    const rect = e.currentTarget.getBoundingClientRect()
+    const x = e.clientX - rect.left - rect.width / 2
+    const y = e.clientY - rect.top - rect.height / 2
+    mouseX.set(x * 0.3)
+    mouseY.set(y * 0.3)
+  }
+
+  function handleBtnMouseLeave() {
+    mouseX.set(0)
+    mouseY.set(0)
+  }
+
+  // Form variants — dramatic 3D flip
   const formVariants = {
     enter: (dir: number) => ({
-      x: dir > 0 ? 80 : -80,
+      rotateY: dir > 0 ? 90 : -90,
       opacity: 0,
-      scale: 0.92,
-      rotateY: dir > 0 ? 25 : -25,
-      filter: 'blur(8px)',
+      scale: 0.8,
+      filter: 'blur(12px)',
     }),
     center: {
-      x: 0,
+      rotateY: 0,
       opacity: 1,
       scale: 1,
-      rotateY: 0,
       filter: 'blur(0px)',
       transition: {
         type: 'spring' as const,
-        stiffness: 320,
-        damping: 28,
-        mass: 0.9,
+        stiffness: 260,
+        damping: 24,
+        mass: 1,
+        staggerChildren: 0.08,
+        delayChildren: 0.15,
       },
     },
     exit: (dir: number) => ({
-      x: dir > 0 ? -80 : 80,
+      rotateY: dir > 0 ? -90 : 90,
       opacity: 0,
-      scale: 0.92,
-      rotateY: dir > 0 ? -25 : 25,
-      filter: 'blur(8px)',
+      scale: 0.8,
+      filter: 'blur(12px)',
       transition: {
-        duration: 0.25,
+        duration: 0.35,
         ease: [0.4, 0, 0.2, 1] as [number, number, number, number],
       },
     }),
   }
 
-  const subRoleVariants = {
-    enter: { opacity: 0, y: 10, scale: 0.97 },
+  const fieldVariants = {
+    enter: { opacity: 0, y: 20, filter: 'blur(6px)' },
     center: {
       opacity: 1,
       y: 0,
-      scale: 1,
-      transition: { type: 'spring' as const, stiffness: 380, damping: 26 },
+      filter: 'blur(0px)',
+      transition: { type: 'spring' as const, stiffness: 320, damping: 26 },
     },
-    exit: { opacity: 0, y: -10, scale: 0.97, transition: { duration: 0.18 } },
+    exit: { opacity: 0, y: -10, filter: 'blur(6px)', transition: { duration: 0.15 } },
   }
 
   const isCamareroMode = accountType === 'negocio' && businessRole === 'empleado'
   const formKey = isCamareroMode ? 'camarero' : accountType === 'negocio' ? 'negocio-propietario' : 'comensal'
 
   return (
-    <main className="relative min-h-screen overflow-hidden bg-background flex items-center justify-center px-6 py-12">
-      {/* Ambient background glow */}
-      <div aria-hidden className="pointer-events-none absolute inset-0 overflow-hidden">
-        <motion.div
-          animate={{
-            x: accountType === 'negocio' ? 80 : -80,
-            opacity: 0.35,
-          }}
-          transition={{ type: 'spring', stiffness: 60, damping: 20 }}
-          className="absolute top-1/2 left-1/2 h-[600px] w-[600px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-accent blur-[160px]"
-        />
+    <>
+      <BurgerStarfield />
+
+      {/* Particle burst layer */}
+      <div className="pointer-events-none fixed inset-0 z-[60]">
+        <AnimatePresence>
+          {particles.map((p) => (
+            <motion.span
+              key={p.id}
+              initial={{ x: p.x, y: p.y, opacity: 1, scale: 1 }}
+              animate={{
+                x: p.x + p.dx,
+                y: p.y + p.dy,
+                opacity: 0,
+                scale: 0,
+              }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.85, ease: [0.25, 0.46, 0.45, 0.94] }}
+              className="absolute rounded-full"
+              style={{
+                left: 0,
+                top: 0,
+                width: p.size,
+                height: p.size,
+                backgroundColor: p.color,
+                boxShadow: `0 0 ${p.size * 3}px ${p.color}`,
+              }}
+            />
+          ))}
+        </AnimatePresence>
       </div>
 
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5, ease: [0.25, 0.46, 0.45, 0.94] }}
-        className="relative w-full max-w-md"
-      >
-        {/* Logo (small, no title) */}
-        <div className="mb-6 flex justify-center">
-          <motion.a
-            href="/"
-            whileHover={{ scale: 1.08, rotate: -3 }}
-            whileTap={{ scale: 0.95 }}
-            className="inline-flex h-12 w-12 items-center justify-center rounded-xl bg-accent text-base font-bold text-white shadow-lg shadow-accent/30"
-          >
-            DF
-          </motion.a>
-        </div>
-
-        {/* Card */}
-        <div className="card" style={{ perspective: 1200 }}>
-          {/* Google OAuth */}
-          {isSupabaseConfigured() && !isCamareroMode && (
-            <>
-              <button
-                onClick={() => signInWithGoogle()}
-                className="btn-secondary w-full py-3 flex items-center justify-center gap-3 mb-4"
-              >
-                <svg className="h-5 w-5" viewBox="0 0 24 24">
-                  <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 01-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" />
-                  <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
-                  <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" />
-                  <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" />
-                </svg>
-                Continuar con Google
-              </button>
-
-              <div className="flex items-center gap-3 mb-4">
-                <div className="flex-1 h-px bg-white/[0.08]" />
-                <span className="text-xs text-foreground-subtle">o con credenciales</span>
-                <div className="flex-1 h-px bg-white/[0.08]" />
-              </div>
-            </>
-          )}
-
-          {/* Main tabs: Comensal / Negocio */}
-          <LayoutGroup id="auth-tabs">
-            <div className="relative mb-4 flex rounded-xl border border-border-subtle bg-background-elevated p-1">
-              {(['comensal', 'negocio'] as AccountType[]).map((t) => {
-                const active = accountType === t
-                return (
-                  <button
-                    key={t}
-                    type="button"
-                    onClick={() => switchAccountType(t)}
-                    className={`relative z-10 flex-1 py-2.5 text-xs font-semibold tracking-wide uppercase transition-colors ${
-                      active ? 'text-white' : 'text-foreground-subtle hover:text-foreground'
-                    }`}
-                  >
-                    {active && (
-                      <motion.span
-                        layoutId="auth-tab-pill"
-                        className="absolute inset-0 rounded-lg bg-accent shadow-lg shadow-accent/30"
-                        transition={{ type: 'spring', stiffness: 400, damping: 32 }}
-                      />
-                    )}
-                    <span className="relative flex items-center justify-center gap-2">
-                      <span className="text-sm">{t === 'comensal' ? '🍽️' : '🏪'}</span>
-                      <span>{t === 'comensal' ? 'Comensal' : 'Negocio'}</span>
-                    </span>
-                  </button>
-                )
-              })}
-            </div>
-
-            {/* Sub-toggle inside Negocio */}
-            <AnimatePresence initial={false}>
-              {accountType === 'negocio' && (
-                <motion.div
-                  key="business-subroles"
-                  initial={{ height: 0, opacity: 0, marginBottom: 0 }}
-                  animate={{ height: 'auto', opacity: 1, marginBottom: 16 }}
-                  exit={{ height: 0, opacity: 0, marginBottom: 0 }}
-                  transition={{ duration: 0.3, ease: [0.4, 0, 0.2, 1] }}
-                  className="overflow-hidden"
-                >
-                  <div className="relative flex rounded-lg border border-border-subtle/60 bg-background/60 p-0.5">
-                    {(['propietario', 'empleado'] as BusinessRole[]).map((r) => {
-                      const active = businessRole === r
-                      return (
-                        <button
-                          key={r}
-                          type="button"
-                          onClick={() => switchBusinessRole(r)}
-                          className={`relative z-10 flex-1 py-1.5 text-[11px] font-medium capitalize transition-colors ${
-                            active ? 'text-accent' : 'text-foreground-subtle hover:text-foreground'
-                          }`}
-                        >
-                          {active && (
-                            <motion.span
-                              layoutId="business-role-pill"
-                              className="absolute inset-0 rounded-md border border-accent/40 bg-accent/10"
-                              transition={{ type: 'spring', stiffness: 500, damping: 34 }}
-                            />
-                          )}
-                          <span className="relative">{r === 'propietario' ? '👔 Propietario' : '👨‍🍳 Empleado'}</span>
-                        </button>
-                      )
-                    })}
-                  </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </LayoutGroup>
-
-          {/* Demo accounts info */}
-          <AnimatePresence mode="wait">
-            <motion.div
-              key={`demo-${formKey}`}
-              variants={subRoleVariants}
-              initial="enter"
-              animate="center"
-              exit="exit"
-              className="mb-5 rounded-xl border border-accent/20 bg-accent/[0.06] px-4 py-3 text-xs"
+      <main className="relative min-h-screen flex items-center justify-center px-6 py-12">
+        <motion.div
+          initial={{ opacity: 0, y: 30, scale: 0.9 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          transition={{ duration: 0.7, ease: [0.25, 0.46, 0.45, 0.94] }}
+          className="relative w-full max-w-md"
+          style={{ perspective: 1400 }}
+        >
+          {/* Logo */}
+          <div className="mb-6 flex justify-center">
+            <motion.a
+              href="/"
+              whileHover={{ scale: 1.12, rotate: -6 }}
+              whileTap={{ scale: 0.92 }}
+              initial={{ y: -20, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              transition={{ delay: 0.2, type: 'spring', stiffness: 300, damping: 20 }}
+              className="inline-flex h-14 w-14 items-center justify-center rounded-2xl bg-accent text-lg font-bold text-white shadow-[0_0_40px_rgba(249,115,22,0.6)]"
             >
-              <p className="font-semibold text-foreground mb-1.5">Cuentas de demo:</p>
-              {accountType === 'comensal' && (
-                <p className="text-foreground-subtle leading-relaxed">
-                  🍽️ comensal@demo.com · password123
-                </p>
-              )}
-              {accountType === 'negocio' && businessRole === 'propietario' && (
-                <>
-                  <p className="text-foreground-subtle leading-relaxed">
-                    🏠 restaurante@demo.com · password123
-                  </p>
-                  <p className="text-foreground-subtle leading-relaxed">
-                    ⚙️ admin@dinefirst.com · password123
-                  </p>
-                </>
-              )}
-              {isCamareroMode && (
-                <>
-                  <p className="text-foreground-subtle leading-relaxed">
-                    👨‍🍳 Restaurante: <span className="text-foreground">la-taberna-del-chef</span>
-                  </p>
-                  <p className="text-foreground-subtle leading-relaxed">
-                    &nbsp;&nbsp;&nbsp;&nbsp;Usuario: <span className="text-foreground">elena</span> · password123
-                  </p>
-                  <p className="text-foreground-subtle leading-relaxed">
-                    &nbsp;&nbsp;&nbsp;&nbsp;Usuario: <span className="text-foreground">diego</span> · password123
-                  </p>
-                </>
-              )}
-            </motion.div>
-          </AnimatePresence>
-
-          {/* Animated form */}
-          <div className="relative" style={{ transformStyle: 'preserve-3d' }}>
-            <AnimatePresence mode="wait" custom={tabDirection}>
-              <motion.form
-                key={formKey}
-                custom={tabDirection}
-                variants={formVariants}
-                initial="enter"
-                animate="center"
-                exit="exit"
-                onSubmit={handleSubmit}
-                className="space-y-4"
-                style={{ transformStyle: 'preserve-3d' }}
-              >
-                {isCamareroMode ? (
-                  <>
-                    <div>
-                      <label className="field-label">Restaurante</label>
-                      <select
-                        value={restaurantSlug}
-                        onChange={(e) => setRestaurantSlug(e.target.value)}
-                        required
-                        className="input w-full"
-                      >
-                        {slugs.map((s) => (
-                          <option key={s} value={s}>{s}</option>
-                        ))}
-                      </select>
-                    </div>
-                    <div>
-                      <label className="field-label">Usuario</label>
-                      <input
-                        type="text"
-                        value={username}
-                        onChange={(e) => setUsername(e.target.value)}
-                        placeholder="nombre de usuario"
-                        required
-                        autoComplete="username"
-                        className="input w-full"
-                      />
-                    </div>
-                  </>
-                ) : (
-                  <div>
-                    <label className="field-label">Email</label>
-                    <input
-                      type="email"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      placeholder={accountType === 'comensal' ? 'tu@email.com' : 'tu@restaurante.com'}
-                      required
-                      className="input w-full"
-                    />
-                  </div>
-                )}
-
-                <div>
-                  <label className="field-label">Contraseña</label>
-                  <input
-                    type="password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    placeholder="••••••••"
-                    required
-                    className="input w-full"
-                  />
-                </div>
-
-                {error && (
-                  <motion.div
-                    initial={{ opacity: 0, x: -10 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    className="rounded-xl border border-red-500/20 bg-red-500/[0.08] px-4 py-2.5 text-xs text-red-400"
-                  >
-                    {error}
-                  </motion.div>
-                )}
-
-                <motion.button
-                  type="submit"
-                  disabled={loading}
-                  whileHover={{ scale: 1.01 }}
-                  whileTap={{ scale: 0.98 }}
-                  className="btn-primary w-full py-3 disabled:opacity-60"
-                >
-                  {loading ? 'Iniciando sesión…' : 'Iniciar sesión'}
-                </motion.button>
-              </motion.form>
-            </AnimatePresence>
+              DF
+            </motion.a>
           </div>
 
-          {!isCamareroMode && (
-            <p className="mt-5 text-center text-xs text-foreground-subtle">
-              ¿No tienes cuenta?{' '}
-              <a href="/register" className="font-medium text-accent hover:text-accent-soft">
-                Regístrate gratis
-              </a>
-            </p>
-          )}
+          {/* Card with rotating conic border */}
+          <motion.div
+            className="relative rounded-2xl p-[1.5px]"
+            style={{
+              rotateX: cardRotX,
+              rotateY: cardRotY,
+              transformStyle: 'preserve-3d',
+            }}
+          >
+            {/* Animated conic gradient border */}
+            <div className="conic-border absolute inset-0 rounded-2xl opacity-80" />
 
-          {isCamareroMode && (
-            <p className="mt-5 text-center text-xs text-foreground-subtle">
-              Tu usuario y contraseña los proporciona el propietario del restaurante.
-            </p>
-          )}
-        </div>
-      </motion.div>
-    </main>
+            {/* Inner card */}
+            <div
+              className="relative rounded-2xl bg-background-soft/90 p-6 backdrop-blur-xl shadow-[0_20px_60px_-15px_rgba(0,0,0,0.6)]"
+              style={{ transformStyle: 'preserve-3d' }}
+            >
+              {/* Google OAuth */}
+              {isSupabaseConfigured() && !isCamareroMode && (
+                <>
+                  <motion.button
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.3 }}
+                    whileHover={{ scale: 1.01 }}
+                    whileTap={{ scale: 0.98 }}
+                    onClick={() => signInWithGoogle()}
+                    className="btn-secondary w-full py-3 flex items-center justify-center gap-3 mb-4"
+                  >
+                    <svg className="h-5 w-5" viewBox="0 0 24 24">
+                      <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 01-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" />
+                      <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
+                      <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" />
+                      <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" />
+                    </svg>
+                    Continuar con Google
+                  </motion.button>
+
+                  <div className="flex items-center gap-3 mb-4">
+                    <div className="flex-1 h-px bg-white/[0.08]" />
+                    <span className="text-xs text-foreground-subtle">o con credenciales</span>
+                    <div className="flex-1 h-px bg-white/[0.08]" />
+                  </div>
+                </>
+              )}
+
+              {/* Main tabs: Comensal / Negocio */}
+              <LayoutGroup id="auth-tabs">
+                <div className="relative mb-4 flex rounded-xl border border-border-subtle bg-background-elevated/60 p-1">
+                  {(['comensal', 'negocio'] as AccountType[]).map((t) => {
+                    const active = accountType === t
+                    return (
+                      <button
+                        key={t}
+                        type="button"
+                        onClick={(e) => switchAccountType(t, e)}
+                        className={`relative z-10 flex-1 py-2.5 text-xs font-semibold tracking-wide uppercase transition-colors ${
+                          active ? 'text-white' : 'text-foreground-subtle hover:text-foreground'
+                        }`}
+                      >
+                        {active && (
+                          <motion.span
+                            layoutId="auth-tab-pill"
+                            className="absolute inset-0 rounded-lg bg-accent shadow-[0_0_24px_rgba(249,115,22,0.5)]"
+                            transition={{ type: 'spring', stiffness: 400, damping: 32 }}
+                          />
+                        )}
+                        <span className="relative flex items-center justify-center gap-2">
+                          <span className="text-sm">{t === 'comensal' ? '🍽️' : '🏪'}</span>
+                          <span>{t === 'comensal' ? 'Comensal' : 'Negocio'}</span>
+                        </span>
+                      </button>
+                    )
+                  })}
+                </div>
+
+                {/* Sub-toggle inside Negocio */}
+                <AnimatePresence initial={false}>
+                  {accountType === 'negocio' && (
+                    <motion.div
+                      key="business-subroles"
+                      initial={{ height: 0, opacity: 0, marginBottom: 0 }}
+                      animate={{ height: 'auto', opacity: 1, marginBottom: 16 }}
+                      exit={{ height: 0, opacity: 0, marginBottom: 0 }}
+                      transition={{ duration: 0.35, ease: [0.4, 0, 0.2, 1] }}
+                      className="overflow-hidden"
+                    >
+                      <div className="relative flex rounded-lg border border-border-subtle/60 bg-background/60 p-0.5">
+                        {(['propietario', 'empleado'] as BusinessRole[]).map((r) => {
+                          const active = businessRole === r
+                          return (
+                            <button
+                              key={r}
+                              type="button"
+                              onClick={(e) => switchBusinessRole(r, e)}
+                              className={`relative z-10 flex-1 py-1.5 text-[11px] font-medium transition-colors ${
+                                active ? 'text-accent' : 'text-foreground-subtle hover:text-foreground'
+                              }`}
+                            >
+                              {active && (
+                                <motion.span
+                                  layoutId="business-role-pill"
+                                  className="absolute inset-0 rounded-md border border-accent/40 bg-accent/10"
+                                  transition={{ type: 'spring', stiffness: 500, damping: 34 }}
+                                />
+                              )}
+                              <span className="relative">{r === 'propietario' ? '👔 Propietario' : '👨‍🍳 Empleado'}</span>
+                            </button>
+                          )
+                        })}
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </LayoutGroup>
+
+              {/* Demo accounts info */}
+              <AnimatePresence mode="wait">
+                <motion.div
+                  key={`demo-${formKey}`}
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -8 }}
+                  transition={{ duration: 0.25 }}
+                  className="mb-5 rounded-xl border border-accent/20 bg-accent/[0.06] px-4 py-3 text-xs"
+                >
+                  <p className="font-semibold text-foreground mb-1.5">Cuentas de demo:</p>
+                  {accountType === 'comensal' && (
+                    <p className="text-foreground-subtle leading-relaxed">
+                      🍽️ comensal@demo.com · password123
+                    </p>
+                  )}
+                  {accountType === 'negocio' && businessRole === 'propietario' && (
+                    <>
+                      <p className="text-foreground-subtle leading-relaxed">
+                        🏠 restaurante@demo.com · password123
+                      </p>
+                      <p className="text-foreground-subtle leading-relaxed">
+                        ⚙️ admin@dinefirst.com · password123
+                      </p>
+                    </>
+                  )}
+                  {isCamareroMode && (
+                    <>
+                      <p className="text-foreground-subtle leading-relaxed">
+                        👨‍🍳 Restaurante: <span className="text-foreground">la-taberna-del-chef</span>
+                      </p>
+                      <p className="text-foreground-subtle leading-relaxed">
+                        &nbsp;&nbsp;&nbsp;&nbsp;Usuario: <span className="text-foreground">elena</span> · password123
+                      </p>
+                      <p className="text-foreground-subtle leading-relaxed">
+                        &nbsp;&nbsp;&nbsp;&nbsp;Usuario: <span className="text-foreground">diego</span> · password123
+                      </p>
+                    </>
+                  )}
+                </motion.div>
+              </AnimatePresence>
+
+              {/* Animated form with full 3D flip */}
+              <div className="relative" style={{ transformStyle: 'preserve-3d', perspective: 1200 }}>
+                <AnimatePresence mode="wait" custom={tabDirection}>
+                  <motion.form
+                    key={formKey}
+                    custom={tabDirection}
+                    variants={formVariants}
+                    initial="enter"
+                    animate="center"
+                    exit="exit"
+                    onSubmit={handleSubmit}
+                    className="space-y-4"
+                    style={{ transformStyle: 'preserve-3d', transformOrigin: 'center center' }}
+                  >
+                    {isCamareroMode ? (
+                      <>
+                        <motion.div variants={fieldVariants}>
+                          <label className="field-label">Restaurante</label>
+                          <select
+                            value={restaurantSlug}
+                            onChange={(e) => setRestaurantSlug(e.target.value)}
+                            required
+                            className="input w-full"
+                          >
+                            {slugs.map((s) => (
+                              <option key={s} value={s}>{s}</option>
+                            ))}
+                          </select>
+                        </motion.div>
+                        <motion.div variants={fieldVariants}>
+                          <label className="field-label">Usuario</label>
+                          <input
+                            type="text"
+                            value={username}
+                            onChange={(e) => setUsername(e.target.value)}
+                            placeholder="nombre de usuario"
+                            required
+                            autoComplete="username"
+                            className="input w-full"
+                          />
+                        </motion.div>
+                      </>
+                    ) : (
+                      <motion.div variants={fieldVariants}>
+                        <label className="field-label">Email</label>
+                        <input
+                          type="email"
+                          value={email}
+                          onChange={(e) => setEmail(e.target.value)}
+                          placeholder={accountType === 'comensal' ? 'tu@email.com' : 'tu@restaurante.com'}
+                          required
+                          className="input w-full"
+                        />
+                      </motion.div>
+                    )}
+
+                    <motion.div variants={fieldVariants}>
+                      <label className="field-label">Contraseña</label>
+                      <input
+                        type="password"
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        placeholder="••••••••"
+                        required
+                        className="input w-full"
+                      />
+                    </motion.div>
+
+                    {error && (
+                      <motion.div
+                        initial={{ opacity: 0, x: -10 }}
+                        animate={{ opacity: 1, x: [0, -8, 8, -6, 6, 0] }}
+                        transition={{ duration: 0.4 }}
+                        className="rounded-xl border border-red-500/20 bg-red-500/[0.08] px-4 py-2.5 text-xs text-red-400"
+                      >
+                        {error}
+                      </motion.div>
+                    )}
+
+                    <motion.div variants={fieldVariants}>
+                      <motion.button
+                        ref={btnRef}
+                        type="submit"
+                        disabled={loading}
+                        onMouseMove={handleBtnMouseMove}
+                        onMouseLeave={handleBtnMouseLeave}
+                        style={{ x: springX, y: springY }}
+                        whileHover={{ scale: 1.02 }}
+                        whileTap={{ scale: 0.96 }}
+                        className="btn-primary w-full py-3 disabled:opacity-60 shadow-[0_0_30px_rgba(249,115,22,0.4)]"
+                      >
+                        {loading ? 'Iniciando sesión…' : 'Iniciar sesión'}
+                      </motion.button>
+                    </motion.div>
+                  </motion.form>
+                </AnimatePresence>
+              </div>
+
+              {!isCamareroMode && (
+                <p className="mt-5 text-center text-xs text-foreground-subtle">
+                  ¿No tienes cuenta?{' '}
+                  <a href="/register" className="font-medium text-accent hover:text-accent-soft">
+                    Regístrate gratis
+                  </a>
+                </p>
+              )}
+
+              {isCamareroMode && (
+                <p className="mt-5 text-center text-xs text-foreground-subtle">
+                  Tu usuario y contraseña los proporciona el propietario del restaurante.
+                </p>
+              )}
+            </div>
+          </motion.div>
+        </motion.div>
+
+        <style jsx>{`
+          @keyframes spin-conic {
+            to {
+              transform: rotate(1turn);
+            }
+          }
+          .conic-border {
+            background: conic-gradient(
+              from 0deg,
+              transparent 0deg,
+              rgba(249, 115, 22, 0.8) 60deg,
+              rgba(253, 186, 116, 0.6) 120deg,
+              transparent 180deg,
+              transparent 270deg,
+              rgba(249, 115, 22, 0.4) 320deg,
+              transparent 360deg
+            );
+            animation: spin-conic 5s linear infinite;
+            mask:
+              linear-gradient(#000 0 0) content-box,
+              linear-gradient(#000 0 0);
+            -webkit-mask:
+              linear-gradient(#000 0 0) content-box,
+              linear-gradient(#000 0 0);
+            mask-composite: exclude;
+            -webkit-mask-composite: xor;
+            padding: 1.5px;
+          }
+        `}</style>
+      </main>
+    </>
   )
 }
