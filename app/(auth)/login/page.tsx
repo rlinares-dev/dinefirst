@@ -199,9 +199,7 @@ export default function LoginPage() {
 
   return (
     <>
-      <BurgerStarfield />
-
-      {/* Particle burst layer */}
+      {/* Particle burst layer (on top of everything) */}
       <div className="pointer-events-none fixed inset-0 z-[60]">
         <AnimatePresence>
           {particles.map((p) => (
@@ -230,12 +228,14 @@ export default function LoginPage() {
         </AnimatePresence>
       </div>
 
-      <main className="relative z-10 min-h-screen flex items-center justify-center px-6 py-12">
+      <main className="relative min-h-screen overflow-hidden flex items-center justify-center px-6 py-12">
+        {/* Burger starfield — layer directly behind the card (between body bg and card) */}
+        <BurgerStarfield />
         <motion.div
           initial={{ opacity: 0, y: 30, scale: 0.9 }}
           animate={{ opacity: 1, y: 0, scale: 1 }}
           transition={{ duration: 0.7, ease: [0.25, 0.46, 0.45, 0.94] }}
-          className="relative w-full max-w-md"
+          className="relative z-10 w-full max-w-md"
           style={{ perspective: 1400 }}
         >
           {/* Logo */}

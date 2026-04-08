@@ -1,169 +1,181 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, CSSProperties } from 'react'
 
-interface Star {
-  x: number
-  y: number
-  size: number
-  delay: number
-  duration: number
-  opacity: number
-}
-
-interface Burger {
+interface Shooter {
   id: number
-  top: number
-  left: number
-  delay: number
-  duration: number
-  size: number
-  tailColor: string
+  top: string
+  left: string
+  delay: string
+  duration: string
 }
 
-const NUM_STARS = 120
-const NUM_BURGERS = 10
+const NUM_SHOOTERS = 20
 
-function randomBurgerColor() {
-  const colors = ['#F97316', '#FDBA74', '#FFEDD5', '#FFD580']
-  return colors[Math.floor(Math.random() * colors.length)]
+// Genera delays/duraciones aleatorias
+function generateShooters(): Shooter[] {
+  return Array.from({ length: NUM_SHOOTERS }, (_, i) => ({
+    id: i,
+    top: `${Math.floor(Math.random() * 55) + 5}%`,
+    left: `${Math.floor(Math.random() * 45) + 50}%`,
+    delay: `${(Math.random() * 9 + i * 0.25).toFixed(2)}s`,
+    duration: `${(Math.random() * 1.8 + 2.5).toFixed(2)}s`,
+  }))
 }
 
 export function BurgerStarfield() {
-  const [stars, setStars] = useState<Star[]>([])
-  const [burgers, setBurgers] = useState<Burger[]>([])
+  const [shooters, setShooters] = useState<Shooter[]>([])
 
   useEffect(() => {
-    const s: Star[] = Array.from({ length: NUM_STARS }, () => ({
-      x: Math.random() * 100,
-      y: Math.random() * 100,
-      size: Math.random() * 2 + 0.4,
-      delay: Math.random() * 5,
-      duration: Math.random() * 3 + 2,
-      opacity: Math.random() * 0.5 + 0.3,
-    }))
-    setStars(s)
-
-    const b: Burger[] = Array.from({ length: NUM_BURGERS }, (_, i) => ({
-      id: i,
-      top: Math.random() * 50, // start in top half
-      left: Math.random() * 40 + 30, // start 30-70% horizontally
-      delay: i * 2.2 + Math.random() * 4,
-      duration: Math.random() * 2 + 3.5,
-      size: Math.random() * 8 + 16,
-      tailColor: randomBurgerColor(),
-    }))
-    setBurgers(b)
+    setShooters(generateShooters())
   }, [])
 
   return (
-    <div className="pointer-events-none fixed inset-0 z-0 overflow-hidden">
-      {/* Deep space gradient */}
-      <div className="absolute inset-0 bg-gradient-to-br from-[#0a0614] via-[#0d0816] to-[#04030a]" />
-
-      {/* Radial orange glow in center — very subtle */}
-      <div className="absolute top-1/2 left-1/2 h-[700px] w-[700px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-accent/[0.06] blur-[160px]" />
-
-      {/* Static twinkling stars */}
-      {stars.map((s, i) => (
-        <span
-          key={`star-${i}`}
-          className="absolute rounded-full bg-white twinkle-star"
-          style={{
-            left: `${s.x}%`,
-            top: `${s.y}%`,
-            width: `${s.size}px`,
-            height: `${s.size}px`,
-            opacity: s.opacity,
-            animationDelay: `${s.delay}s`,
-            animationDuration: `${s.duration}s`,
-          }}
-        />
-      ))}
-
-      {/* Shooting burgers 🍔 */}
-      {burgers.map((b) => (
-        <div
-          key={`burger-${b.id}`}
-          className="shooting-burger absolute"
-          style={{
-            top: `${b.top}%`,
-            left: `${b.left}%`,
-            animationDelay: `${b.delay}s`,
-            animationDuration: `${b.duration}s`,
-            // @ts-expect-error CSS custom property
-            '--tail-color': b.tailColor,
-            '--burger-size': `${b.size}px`,
-          }}
-        >
-          <span className="burger-tail" />
-          <span className="burger-emoji">🍔</span>
-        </div>
-      ))}
+    <div className="burger-stars pointer-events-none absolute inset-0 overflow-hidden">
+      {/* Rotated container — hace que todos los hijos se desplacen diagonalmente */}
+      <div className="stars-inner">
+        {shooters.map((s) => (
+          <div
+            key={s.id}
+            className="shooting_star"
+            style={
+              {
+                top: s.top,
+                left: s.left,
+                '--delay': s.delay,
+                '--duration': s.duration,
+              } as CSSProperties
+            }
+          >
+            <span className="burger-head">🍔</span>
+          </div>
+        ))}
+      </div>
 
       <style jsx>{`
-        @keyframes twinkle {
-          0%,
-          100% {
-            opacity: 0.1;
-            transform: scale(0.8);
-          }
-          50% {
-            opacity: 1;
-            transform: scale(1.2);
-          }
-        }
-        .twinkle-star {
-          animation: twinkle ease-in-out infinite;
-          box-shadow: 0 0 4px rgba(255, 255, 255, 0.8);
+        .burger-stars {
+          /* Fondo degradado estilo codepen, con colores del proyecto */
+          background: radial-gradient(ellipse at bottom, #1a0f08 0%, #050310 60%, #020108 100%);
         }
 
-        @keyframes burger-shoot {
-          0% {
-            transform: translate3d(0, 0, 0) rotate(-45deg);
-            opacity: 0;
-          }
-          5% {
-            opacity: 1;
-          }
-          95% {
-            opacity: 1;
-          }
-          100% {
-            transform: translate3d(-140vw, 140vh, 0) rotate(-45deg);
-            opacity: 0;
-          }
+        .stars-inner {
+          position: absolute;
+          inset: 0;
+          transform: rotateZ(-45deg);
         }
 
-        .shooting-burger {
-          display: flex;
-          align-items: center;
-          animation: burger-shoot linear infinite;
-          filter: drop-shadow(0 0 6px var(--tail-color));
+        /* Cada shooting star: una barra horizontal con gradiente (cola) */
+        .shooting_star {
+          position: absolute;
+          height: 2px;
+          background: linear-gradient(-45deg, #f97316, rgba(249, 115, 22, 0));
+          border-radius: 999px;
+          filter: drop-shadow(0 0 6px #fdba74);
+          animation: tail var(--duration) ease-in-out infinite,
+            shooting var(--duration) ease-in-out infinite;
+          animation-delay: var(--delay);
         }
 
-        .burger-tail {
-          display: block;
-          width: 140px;
+        /* Destello central al principio (como el codepen) */
+        .shooting_star::before {
+          content: '';
+          position: absolute;
+          top: calc(50% - 1px);
+          right: 0;
           height: 2px;
           background: linear-gradient(
-            90deg,
-            transparent,
-            var(--tail-color) 40%,
-            var(--tail-color)
+            -45deg,
+            rgba(249, 115, 22, 0),
+            #fdba74,
+            rgba(249, 115, 22, 0)
           );
-          border-radius: 999px;
-          filter: blur(0.6px);
-          box-shadow: 0 0 10px var(--tail-color);
-          margin-right: -6px;
+          transform: translateX(50%) rotateZ(45deg);
+          border-radius: 100%;
+          animation: shining var(--duration) ease-in-out infinite;
+          animation-delay: var(--delay);
         }
 
-        .burger-emoji {
-          font-size: var(--burger-size);
+        /* Brillo detrás */
+        .shooting_star::after {
+          content: '';
+          position: absolute;
+          top: calc(50% - 1px);
+          right: 0;
+          height: 2px;
+          background: linear-gradient(
+            -45deg,
+            rgba(249, 115, 22, 0),
+            #f97316,
+            rgba(249, 115, 22, 0)
+          );
+          transform: translateX(50%) rotateZ(-45deg);
+          border-radius: 100%;
+          animation: shining var(--duration) ease-in-out infinite;
+          animation-delay: var(--delay);
+        }
+
+        /* La hamburguesa va en la cabeza de la estrella fugaz */
+        .burger-head {
+          position: absolute;
+          top: 50%;
+          right: 0;
+          font-size: 22px;
           line-height: 1;
-          display: inline-block;
-          filter: drop-shadow(0 0 10px var(--tail-color));
-          transform: rotate(45deg); /* compensate parent rotation so burger is upright */
+          transform: translate(50%, -50%) rotate(45deg);
+          filter: drop-shadow(0 0 8px #f97316);
+          animation: burger-pop var(--duration) ease-in-out infinite;
+          animation-delay: var(--delay);
+        }
+
+        @keyframes tail {
+          0% {
+            width: 0;
+          }
+          30% {
+            width: 100px;
+          }
+          100% {
+            width: 0;
+          }
+        }
+
+        @keyframes shining {
+          0% {
+            width: 0;
+          }
+          50% {
+            width: 30px;
+          }
+          100% {
+            width: 0;
+          }
+        }
+
+        @keyframes shooting {
+          0% {
+            transform: translateX(0);
+          }
+          100% {
+            transform: translateX(320px);
+          }
+        }
+
+        @keyframes burger-pop {
+          0% {
+            opacity: 0;
+            transform: translate(50%, -50%) rotate(45deg) scale(0.6);
+          }
+          20% {
+            opacity: 1;
+            transform: translate(50%, -50%) rotate(45deg) scale(1);
+          }
+          80% {
+            opacity: 1;
+          }
+          100% {
+            opacity: 0;
+            transform: translate(50%, -50%) rotate(45deg) scale(0.6);
+          }
         }
       `}</style>
     </div>
