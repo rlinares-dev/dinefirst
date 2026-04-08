@@ -9,6 +9,7 @@ import { getUser, clearUser } from '@/lib/data'
 import type { User, Role } from '@/types/database'
 import { usePushNotifications } from '@/lib/hooks/use-push-notifications'
 import ChatWidget from '@/components/chat/chat-widget'
+import { isSupabaseConfigured } from '@/lib/env'
 
 const useIsomorphicLayoutEffect = typeof window !== 'undefined' ? useLayoutEffect : useEffect
 
@@ -70,7 +71,16 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     }
   }, [user, pathname, router])
 
-  function handleLogout() {
+  async function handleLogout() {
+    try {
+      if (isSupabaseConfigured()) {
+        const { createClient } = await import('@/lib/supabase/client')
+        const supabase = createClient()
+        await supabase.auth.signOut()
+      }
+    } catch (err) {
+      console.error('Error signing out of Supabase:', err)
+    }
     clearUser()
     window.location.href = '/'
   }
@@ -200,6 +210,14 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             <Link href="/" className="text-xs text-foreground-subtle hover:text-accent">
               ← Ir al inicio
             </Link>
+            <button
+              onClick={handleLogout}
+              className="flex items-center gap-1.5 rounded-md border border-border-subtle px-3 py-1.5 text-xs text-foreground-subtle transition hover:border-red-500/40 hover:bg-red-500/10 hover:text-red-400"
+              title="Cerrar sesión"
+            >
+              <span>⏻</span>
+              <span className="hidden sm:inline">Cerrar sesión</span>
+            </button>
           </div>
         </header>
 
