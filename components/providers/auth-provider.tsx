@@ -260,17 +260,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [])
 
   const signOut = useCallback(async () => {
-    if (!isSupabaseConfigured()) {
-      const { clearUser } = require('@/lib/data')
-      clearUser()
-      setUser(null)
-      window.location.href = '/'
-      return
-    }
-
-    const { createClient } = await import('@/lib/supabase/client')
-    const supabase = createClient()
-    await supabase.auth.signOut()
+    const { logout } = require('@/lib/data')
+    await logout()
     setUser(null)
     window.location.href = '/'
   }, [])

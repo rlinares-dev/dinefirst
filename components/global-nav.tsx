@@ -4,8 +4,7 @@ import { useState, useEffect } from 'react'
 import { usePathname } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
 import clsx from 'clsx'
-import { getUser, clearUser } from '@/lib/data'
-import { isSupabaseConfigured } from '@/lib/env'
+import { getUser, logout } from '@/lib/data'
 import type { User } from '@/types/database'
 
 const HIDDEN_PREFIXES = ['/app', '/dashboard', '/admin', '/mesa']
@@ -74,16 +73,7 @@ export function GlobalNav() {
   }, [pathname])
 
   async function handleLogout() {
-    try {
-      if (isSupabaseConfigured()) {
-        const { createClient } = await import('@/lib/supabase/client')
-        const supabase = createClient()
-        await supabase.auth.signOut()
-      }
-    } catch (err) {
-      console.error('Error signing out:', err)
-    }
-    clearUser()
+    await logout()
     setUser(null)
     setMenuOpen(false)
     window.location.href = '/'

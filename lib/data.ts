@@ -55,6 +55,32 @@ export function clearUser(): void {
   if (typeof window !== 'undefined') localStorage.removeItem(KEY_USER)
 }
 
+/**
+ * Cierre de sesión completo: Supabase signOut + limpiar localStorage.
+ * Uso: llamar desde cualquier botón de "Cerrar sesión" en la app.
+ */
+export async function logout(): Promise<void> {
+  if (typeof window === 'undefined') return
+
+  // 1. Cerrar sesión de Supabase si está configurado
+  try {
+    const { isSupabaseConfigured } = require('@/lib/env')
+    if (isSupabaseConfigured()) {
+      const { createClient } = require('@/lib/supabase/client')
+      const supabase = createClient()
+      await supabase.auth.signOut()
+    }
+  } catch {
+    // Supabase no disponible — continuar con limpieza local
+  }
+
+  // 2. Limpiar todos los datos de usuario de localStorage
+  localStorage.removeItem(KEY_USER)
+
+  // 3. Notificar a componentes que escuchan (GlobalNav, etc.)
+  window.dispatchEvent(new CustomEvent('df-auth-change'))
+}
+
 // ─── User Registry ────────────────────────────────────────────────────────────
 
 const KEY_USERS = 'df_users'

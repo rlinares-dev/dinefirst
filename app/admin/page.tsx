@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import clsx from 'clsx'
-import { getRestaurants, getReservations, getUser, clearUser } from '@/lib/data'
+import { getRestaurants, getReservations, getUser, logout } from '@/lib/data'
 import type { Restaurant, Reservation } from '@/types/database'
 
 export default function AdminPage() {
@@ -48,7 +48,7 @@ export default function AdminPage() {
             <p className="mt-1 text-sm">Gestión global de la plataforma</p>
           </div>
           <button
-            onClick={() => { clearUser(); window.location.href = '/' }}
+            onClick={() => { logout(); window.location.href = '/' }}
             className="rounded-md border border-border-subtle px-3 py-1.5 text-xs text-foreground-subtle hover:text-red-400 hover:border-red-400/30 transition"
           >
             Cerrar sesión

@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { getUser, setUser, clearUser, getReservationsForUser } from '@/lib/data'
+import { getUser, setUser, logout, getReservationsForUser } from '@/lib/data'
 import { isSupabaseConfigured } from '@/lib/env'
 import type { User, Reservation } from '@/types/database'
 
@@ -70,7 +70,7 @@ export default function AppProfilePage() {
   }
 
   function handleLogout() {
-    clearUser()
+    logout()
     window.location.href = '/'
   }
 
