@@ -56,9 +56,17 @@ export default function LoginPage() {
 
   useEffect(() => {
     async function loadSlugs() {
-      const s = isSupabaseConfigured() ? await sbGetRestaurantSlugs() : getRestaurantSlugs()
-      setSlugs(s)
-      if (s.length > 0) setRestaurantSlug(s[0])
+      let s: string[] = []
+      if (isSupabaseConfigured()) {
+        s = await sbGetRestaurantSlugs()
+      }
+      // Fallback a mock si Supabase no devolvió restaurantes (dev / demo).
+      if (s.length === 0) s = getRestaurantSlugs()
+      // Fusiona ambos sin duplicados para que siempre estén los slugs demo.
+      const mockSlugs = getRestaurantSlugs()
+      const merged = Array.from(new Set([...s, ...mockSlugs]))
+      setSlugs(merged)
+      if (merged.length > 0) setRestaurantSlug(merged[0])
     }
     loadSlugs()
   }, [])
@@ -228,7 +236,7 @@ export default function LoginPage() {
         </AnimatePresence>
       </div>
 
-      <main className="relative min-h-screen overflow-hidden flex items-center justify-center px-6 py-12">
+      <main className="relative overflow-hidden flex flex-1 items-center justify-center px-6 py-4" style={{ minHeight: 0 }}>
         {/* Burger starfield — layer directly behind the card (between body bg and card) */}
         <BurgerStarfield />
         <motion.div
@@ -238,21 +246,6 @@ export default function LoginPage() {
           className="relative z-10 w-full max-w-md"
           style={{ perspective: 1400 }}
         >
-          {/* Logo */}
-          <div className="mb-6 flex justify-center">
-            <motion.a
-              href="/"
-              whileHover={{ scale: 1.1, rotate: -4 }}
-              whileTap={{ scale: 0.94 }}
-              initial={{ y: -20, opacity: 0 }}
-              animate={{ y: 0, opacity: 1 }}
-              transition={{ delay: 0.2, type: 'spring', stiffness: 300, damping: 20 }}
-              className="inline-flex h-12 w-12 items-center justify-center rounded-xl bg-accent text-base font-bold text-white"
-            >
-              DF
-            </motion.a>
-          </div>
-
           {/* Card with subtle border */}
           <motion.div
             className="relative rounded-2xl"
@@ -264,7 +257,7 @@ export default function LoginPage() {
           >
             {/* Inner card */}
             <div
-              className="relative rounded-2xl border border-white/10 bg-background-soft/80 p-6 backdrop-blur-xl shadow-[0_20px_60px_-20px_rgba(0,0,0,0.7)]"
+              className="relative rounded-2xl border border-white/10 bg-background-soft/80 p-4 backdrop-blur-xl shadow-[0_20px_60px_-20px_rgba(0,0,0,0.7)]"
               style={{ transformStyle: 'preserve-3d' }}
             >
               {/* Google OAuth */}
@@ -277,7 +270,7 @@ export default function LoginPage() {
                     whileHover={{ scale: 1.01 }}
                     whileTap={{ scale: 0.98 }}
                     onClick={() => signInWithGoogle()}
-                    className="btn-secondary w-full py-3 flex items-center justify-center gap-3 mb-4"
+                    className="btn-secondary w-full py-2 flex items-center justify-center gap-2 mb-2 text-sm"
                   >
                     <svg className="h-5 w-5" viewBox="0 0 24 24">
                       <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 01-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" />
@@ -288,7 +281,7 @@ export default function LoginPage() {
                     Continuar con Google
                   </motion.button>
 
-                  <div className="flex items-center gap-3 mb-4">
+                  <div className="flex items-center gap-3 mb-2">
                     <div className="flex-1 h-px bg-white/[0.08]" />
                     <span className="text-xs text-foreground-subtle">o con credenciales</span>
                     <div className="flex-1 h-px bg-white/[0.08]" />
@@ -298,7 +291,7 @@ export default function LoginPage() {
 
               {/* Main tabs: Comensal / Negocio */}
               <LayoutGroup id="auth-tabs">
-                <div className="relative mb-4 flex rounded-xl border border-border-subtle bg-background-elevated/60 p-1">
+                <div className="relative mb-2 flex rounded-xl border border-border-subtle bg-background-elevated/60 p-1">
                   {(['comensal', 'negocio'] as AccountType[]).map((t) => {
                     const active = accountType === t
                     return (
@@ -306,7 +299,7 @@ export default function LoginPage() {
                         key={t}
                         type="button"
                         onClick={(e) => switchAccountType(t, e)}
-                        className={`relative z-10 flex-1 py-2.5 text-xs font-semibold tracking-wide uppercase transition-colors ${
+                        className={`relative z-10 flex-1 py-2 text-xs font-semibold tracking-wide uppercase transition-colors ${
                           active ? 'text-white' : 'text-foreground-subtle hover:text-foreground'
                         }`}
                       >
@@ -374,7 +367,7 @@ export default function LoginPage() {
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -8 }}
                   transition={{ duration: 0.25 }}
-                  className="mb-5 rounded-xl border border-accent/20 bg-accent/[0.06] px-4 py-3 text-xs"
+                  className="mb-2 rounded-xl border border-accent/20 bg-accent/[0.06] px-3 py-1.5 text-[11px]"
                 >
                   <p className="font-semibold text-foreground mb-1.5">Cuentas de demo:</p>
                   {accountType === 'comensal' && (
@@ -419,7 +412,7 @@ export default function LoginPage() {
                     animate="center"
                     exit="exit"
                     onSubmit={handleSubmit}
-                    className="space-y-4"
+                    className="space-y-2"
                     style={{ transformStyle: 'preserve-3d', transformOrigin: 'center center' }}
                   >
                     {isCamareroMode ? (
@@ -491,7 +484,7 @@ export default function LoginPage() {
                       <button
                         type="submit"
                         disabled={loading}
-                        className="shine-btn group relative w-full overflow-hidden rounded-full bg-accent py-3 text-sm font-semibold text-white transition-all hover:bg-accent-strong disabled:opacity-60"
+                        className="shine-btn group relative w-full overflow-hidden rounded-full bg-accent py-2.5 text-sm font-semibold text-white transition-all hover:bg-accent-strong disabled:opacity-60 mt-1"
                       >
                         <span className="relative z-10">
                           {loading ? 'Iniciando sesión…' : 'Iniciar sesión'}
@@ -507,7 +500,7 @@ export default function LoginPage() {
               </div>
 
               {!isCamareroMode && (
-                <p className="mt-5 text-center text-xs text-foreground-subtle">
+                <p className="mt-2 text-center text-xs text-foreground-subtle">
                   ¿No tienes cuenta?{' '}
                   <a href="/register" className="font-medium text-accent hover:text-accent-soft">
                     Regístrate gratis
@@ -516,7 +509,7 @@ export default function LoginPage() {
               )}
 
               {isCamareroMode && (
-                <p className="mt-5 text-center text-xs text-foreground-subtle">
+                <p className="mt-2 text-center text-xs text-foreground-subtle">
                   Tu usuario y contraseña los proporciona el propietario del restaurante.
                 </p>
               )}

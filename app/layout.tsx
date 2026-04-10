@@ -56,7 +56,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <ToastProvider>
             <div className="min-h-screen flex flex-col">
               <GlobalNav />
-              <main className="flex-1">{children}</main>
+              <main className="flex-1 flex flex-col" style={{ minHeight: 0 }}>{children}</main>
               <GlobalFooter />
               <MobileBottomNav />
               <InstallPrompt />

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import clsx from 'clsx'
-import { getUser, getReservationsForUser, updateReservationStatus } from '@/lib/data'
+import { getUser, getReservationsForUser, updateReservationStatus, getRestaurants } from '@/lib/data'
 import { emailReservationCancellation } from '@/lib/email-client'
 import type { Reservation, ReservationStatus } from '@/types/database'
 
@@ -20,22 +20,22 @@ const STATUS_STYLE: Record<ReservationStatus, string> = {
   no_show: 'text-foreground-subtle border-border-subtle bg-border-subtle/20',
 }
 
-const SLUG_MAP: Record<string, string> = {
-  'rest-1': 'la-taberna-del-chef',
-  'rest-2': 'el-rincon-de-la-abuela',
-  'rest-3': 'sake-and-fusion',
-}
-
 export default function AppReservasPage() {
   const [reservations, setReservations] = useState<Reservation[]>([])
   const [filter, setFilter] = useState<ReservationStatus | 'all'>('all')
   const [cancelId, setCancelId] = useState<string | null>(null)
   const [loaded, setLoaded] = useState(false)
+  const [slugMap, setSlugMap] = useState<Record<string, string>>({})
 
   useEffect(() => {
     const user = getUser()
     if (user) setReservations(getReservationsForUser(user.id))
     else setReservations([])
+    const map: Record<string, string> = {}
+    getRestaurants().forEach((r) => {
+      map[r.id] = r.slug
+    })
+    setSlugMap(map)
     setLoaded(true)
   }, [])
 
@@ -181,7 +181,7 @@ export default function AppReservasPage() {
                           </span>
                           <div className="flex gap-3">
                             <a
-                              href={`/restaurantes/${res.restaurantCity}/${SLUG_MAP[res.restaurantId] ?? res.restaurantId}`}
+                              href={`/restaurantes/${res.restaurantCity}/${slugMap[res.restaurantId] ?? res.restaurantId}`}
                               className="text-xs text-accent hover:text-accent-soft transition"
                             >
                               Ver restaurante

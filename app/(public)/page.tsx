@@ -1,85 +1,43 @@
 'use client'
 
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { motion, useScroll, useTransform } from 'framer-motion'
 import clsx from 'clsx'
 import { ScrollReveal, TextReveal, CountUp } from '@/components/ui/scroll-reveal'
 import { StaggeredGrid } from '@/components/ui/staggered-list'
+import { getRestaurants } from '@/lib/data'
+import type { Restaurant } from '@/types/database'
 
-const FEATURED_RESTAURANTS = [
-  {
-    name: 'La Taberna del Chef',
-    cuisine: 'Española',
-    emoji: '🥘',
-    rating: 4.7,
-    reviews: 234,
-    city: 'Madrid',
-    slug: '/restaurantes/madrid/la-taberna-del-chef',
-    priceRange: '€€€',
-    tags: ['De autor', 'Terraza'],
-    highlight: 'Mejor restaurante Madrid 2025',
-  },
-  {
-    name: 'El Rincón de la Abuela',
-    cuisine: 'Catalana',
-    emoji: '🍳',
-    rating: 4.9,
-    reviews: 512,
-    city: 'Barcelona',
-    slug: '/restaurantes/barcelona/el-rincon-de-la-abuela',
-    priceRange: '€€',
-    tags: ['Familiar', 'Tradicional'],
-    highlight: 'Top valorado en Barcelona',
-  },
-  {
-    name: 'Sake & Fusion',
-    cuisine: 'Japonesa',
-    emoji: '🍱',
-    rating: 4.8,
-    reviews: 178,
-    city: 'Valencia',
-    slug: '/restaurantes/valencia/sake-and-fusion',
-    priceRange: '€€€€',
-    tags: ['Fusión', 'Omakase'],
-    highlight: 'Experiencia omakase única',
-  },
-  {
-    name: 'Café Central',
-    cuisine: 'Cafetería',
-    emoji: '☕',
-    rating: 4.6,
-    reviews: 340,
-    city: 'Madrid',
-    slug: '/app',
-    priceRange: '€',
-    tags: ['Brunch', 'Specialty Coffee'],
-    highlight: 'Mejor brunch de Madrid',
-  },
-  {
-    name: 'La Trattoria Bella',
-    cuisine: 'Italiana',
-    emoji: '🍕',
-    rating: 4.5,
-    reviews: 289,
-    city: 'Sevilla',
-    slug: '/app',
-    priceRange: '€€',
-    tags: ['Pizza', 'Pasta fresca'],
-    highlight: 'Pizza napolitana auténtica',
-  },
-  {
-    name: 'Mar y Tierra',
-    cuisine: 'Mediterránea',
-    emoji: '🦐',
-    rating: 4.7,
-    reviews: 198,
-    city: 'Barcelona',
-    slug: '/app',
-    priceRange: '€€€',
-    tags: ['Mariscos', 'Vista al mar'],
-    highlight: 'Terraza con vistas al mar',
-  },
-]
+// Fallbacks para restaurantes sin imagen subida (por cocina)
+const CUISINE_EMOJI: Record<string, string> = {
+  española: '🥘',
+  catalana: '🍳',
+  japonesa: '🍱',
+  italiana: '🍕',
+  mediterránea: '🦐',
+  mexicana: '🌮',
+  francesa: '🥐',
+  china: '🥟',
+  cafetería: '☕',
+}
+const cuisineEmoji = (cuisine: string) => {
+  const key = Object.keys(CUISINE_EMOJI).find((k) => cuisine.toLowerCase().includes(k))
+  return key ? CUISINE_EMOJI[key] : '🍽️'
+}
+
+// Tags decorativos según plan (visual only)
+const TAGS_BY_PLAN: Record<string, string[]> = {
+  basic: ['Tradicional'],
+  pro: ['De autor', 'Recomendado'],
+  premium: ['Premium', 'Experiencia'],
+}
+
+// Rango de precio aproximado según plan
+const PRICE_BY_PLAN: Record<string, string> = {
+  basic: '€',
+  pro: '€€',
+  premium: '€€€',
+}
 
 const FEATURES = [
   {
@@ -194,8 +152,18 @@ const FAQS = [
 function FeaturedCarousel() {
   const scrollRef = useRef<HTMLDivElement>(null)
   const [activeIdx, setActiveIdx] = useState(0)
-  const totalSlides = FEATURED_RESTAURANTS.length
+  const [restaurants, setRestaurants] = useState<Restaurant[]>([])
   const autoplayRef = useRef<ReturnType<typeof setInterval> | null>(null)
+
+  // Carga los restaurantes reales (mock o los que haya subido el usuario)
+  useEffect(() => {
+    const list = getRestaurants()
+      .filter((r) => r.isActive)
+      .sort((a, b) => b.rating - a.rating)
+    setRestaurants(list)
+  }, [])
+
+  const totalSlides = restaurants.length
 
   const scrollToIdx = useCallback((idx: number) => {
     const el = scrollRef.current
@@ -244,7 +212,7 @@ function FeaturedCarousel() {
   }
 
   return (
-    <section className="bg-background py-20 overflow-hidden">
+    <section className="bg-background py-20">
       <div className="mx-auto max-w-6xl px-6">
         <ScrollReveal direction="up" className="mb-10 flex items-end justify-between">
           <div>
@@ -280,71 +248,122 @@ function FeaturedCarousel() {
           onScroll={handleScroll}
           onMouseEnter={pauseAutoplay}
           onMouseLeave={resumeAutoplay}
-          className="flex gap-5 overflow-x-auto scroll-smooth pb-4 snap-x snap-mandatory scrollbar-none"
+          className="flex gap-5 overflow-x-auto scroll-smooth px-1 pt-4 pb-6 snap-x snap-mandatory scrollbar-none"
           style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
         >
-          {FEATURED_RESTAURANTS.map((r) => (
-            <motion.a
-              key={r.name}
-              href={r.slug}
-              whileHover={{ y: -6 }}
-              transition={{ type: 'spring', stiffness: 300, damping: 20 }}
-              className="card card-shine group flex w-[300px] shrink-0 flex-col overflow-hidden p-0 snap-start md:w-[340px]"
-            >
-              <div className="relative flex h-48 w-full items-center justify-center bg-background-soft overflow-hidden">
-                <motion.span
-                  className="text-8xl"
-                  whileHover={{ scale: 1.15, rotate: 5 }}
-                  transition={{ type: 'spring', stiffness: 250, damping: 15 }}
-                >
-                  {r.emoji}
-                </motion.span>
-                <span className="absolute top-3 right-3 rounded-full bg-black/60 px-2.5 py-1 text-xs font-semibold text-accent">
-                  {r.priceRange}
-                </span>
-                <span className="absolute bottom-3 left-3 rounded-full bg-accent/90 px-3 py-1 text-[10px] font-bold text-white shadow-lg">
-                  {r.highlight}
-                </span>
-              </div>
+          {restaurants.map((r) => {
+            const tags = TAGS_BY_PLAN[r.plan] || []
+            const priceRange = PRICE_BY_PLAN[r.plan] || '€€'
+            const coverImage = r.images?.[0]
+            const cityLabel = r.city.charAt(0).toUpperCase() + r.city.slice(1)
+            return (
+              <motion.a
+                key={r.id}
+                href={`/restaurantes/${r.city}/${r.slug}`}
+                whileHover={{ y: -8 }}
+                transition={{ type: 'spring', stiffness: 300, damping: 20 }}
+                className="group flex w-[300px] shrink-0 flex-col rounded-2xl border border-white/[0.08] bg-[#1a1a1a] shadow-[0_4px_16px_rgba(0,0,0,0.25)] transition-[border-color,box-shadow] duration-300 hover:border-accent/50 hover:shadow-[0_16px_40px_-12px_rgba(249,115,22,0.35)] snap-start md:w-[340px]"
+              >
+                {/* Imagen real del restaurante con fallback a emoji */}
+                <div className="relative h-44 w-full overflow-hidden rounded-t-2xl">
+                  {coverImage ? (
+                    <>
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={coverImage}
+                        alt={r.name}
+                        className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.06]"
+                        loading="lazy"
+                      />
+                      {/* Gradiente oscuro en la base para legibilidad del ribbon */}
+                      <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-black/30" />
+                    </>
+                  ) : (
+                    <div
+                      className="flex h-full w-full items-center justify-center"
+                      style={{
+                        background:
+                          'radial-gradient(ellipse at center, rgba(249,115,22,0.18) 0%, #0f0f0f 70%)',
+                      }}
+                    >
+                      <motion.span
+                        className="text-7xl drop-shadow-[0_4px_12px_rgba(0,0,0,0.5)]"
+                        whileHover={{ scale: 1.12, rotate: 4 }}
+                        transition={{ type: 'spring', stiffness: 250, damping: 15 }}
+                      >
+                        {cuisineEmoji(r.cuisineType)}
+                      </motion.span>
+                    </div>
+                  )}
 
-              <div className="flex flex-1 flex-col p-5">
-                <div className="mb-2 flex items-start justify-between gap-2">
-                  <h3 className="text-base font-bold text-foreground">{r.name}</h3>
-                  <span className="pill shrink-0 text-[10px]">{r.cuisine}</span>
-                </div>
-
-                <div className="mb-3 flex items-center gap-2">
-                  <span className="text-sm tracking-wide text-accent">
-                    {'★'.repeat(Math.floor(r.rating))}
-                    <span className="text-foreground-subtle/30">{'★'.repeat(5 - Math.floor(r.rating))}</span>
+                  {/* Price range chip */}
+                  <span className="absolute top-3 right-3 rounded-full border border-white/10 bg-black/70 px-2.5 py-1 text-[11px] font-bold text-accent backdrop-blur-sm">
+                    {priceRange}
                   </span>
-                  <span className="text-xs font-semibold text-foreground">{r.rating}</span>
-                  <span className="text-xs text-foreground-subtle">({r.reviews})</span>
+
+                  {/* City chip */}
+                  <span className="absolute top-3 left-3 rounded-full border border-white/10 bg-black/70 px-2.5 py-1 text-[11px] font-medium text-foreground backdrop-blur-sm">
+                    📍 {cityLabel}
+                  </span>
+
+                  {/* Highlight ribbon */}
+                  <span className="absolute bottom-3 left-3 right-3 truncate rounded-full bg-gradient-to-r from-accent to-accent-strong px-3 py-1.5 text-center text-[11px] font-bold text-white shadow-[0_4px_12px_rgba(249,115,22,0.4)]">
+                    ★ {r.rating.toFixed(1)} · {r.cuisineType}
+                  </span>
                 </div>
 
-                <div className="mb-4 flex flex-wrap gap-1.5">
-                  {r.tags.map((tag) => (
-                    <span key={tag} className="rounded-full bg-white/[0.04] border border-white/[0.06] px-2 py-0.5 text-[10px] text-foreground-subtle">
-                      {tag}
+                <div className="flex flex-1 flex-col p-5">
+                  <div className="mb-3 flex items-start justify-between gap-2">
+                    <h3 className="text-base font-bold leading-tight text-foreground">
+                      {r.name}
+                    </h3>
+                    <span className="shrink-0 rounded-full border border-accent/20 bg-accent/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-accent">
+                      {r.plan}
                     </span>
-                  ))}
-                  <span className="rounded-full bg-white/[0.04] border border-white/[0.06] px-2 py-0.5 text-[10px] text-foreground-subtle">
-                    📍 {r.city}
-                  </span>
-                </div>
+                  </div>
 
-                <div className="mt-auto">
-                  <span className="btn-primary inline-flex w-full justify-center py-2.5 text-xs group-hover:shadow-glow-sm transition-shadow duration-300">
-                    Reservar mesa →
-                  </span>
+                  <div className="mb-4 flex items-center gap-2">
+                    <div className="flex items-center gap-1 rounded-full bg-white/[0.04] px-2.5 py-1">
+                      <span className="text-sm text-accent">★</span>
+                      <span className="text-xs font-bold text-foreground">
+                        {r.rating.toFixed(1)}
+                      </span>
+                    </div>
+                    <span className="text-xs text-foreground-subtle">
+                      {r.reviewCount} reseñas
+                    </span>
+                  </div>
+
+                  <div className="mb-5 flex flex-wrap gap-1.5">
+                    {tags.map((tag) => (
+                      <span
+                        key={tag}
+                        className="rounded-full border border-white/[0.06] bg-white/[0.03] px-2 py-0.5 text-[10px] text-foreground-subtle"
+                      >
+                        {tag}
+                      </span>
+                    ))}
+                    <span className="rounded-full border border-white/[0.06] bg-white/[0.03] px-2 py-0.5 text-[10px] text-foreground-subtle">
+                      {r.capacity} plazas
+                    </span>
+                  </div>
+
+                  <div className="mt-auto">
+                    <span className="flex w-full items-center justify-center gap-1.5 rounded-full bg-accent py-2.5 text-xs font-semibold text-white transition-all duration-300 group-hover:bg-accent-strong group-hover:shadow-[0_8px_20px_-4px_rgba(249,115,22,0.5)]">
+                      Reservar mesa
+                      <span className="transition-transform duration-300 group-hover:translate-x-0.5">
+                        →
+                      </span>
+                    </span>
+                  </div>
                 </div>
-              </div>
-            </motion.a>
-          ))}
+              </motion.a>
+            )
+          })}
         </div>
 
         <div className="mt-6 flex items-center justify-center gap-2">
-          {FEATURED_RESTAURANTS.map((_, i) => (
+          {restaurants.map((_, i) => (
             <motion.button
               key={i}
               onClick={() => { pauseAutoplay(); scrollToIdx(i); resumeAutoplay() }}
@@ -373,6 +392,14 @@ function FeaturedCarousel() {
 
 export default function LandingPage() {
   const [openFaq, setOpenFaq] = useState<number | null>(null)
+  const [isDesktop, setIsDesktop] = useState(false)
+  useEffect(() => {
+    const mq = window.matchMedia('(min-width: 768px)')
+    const update = () => setIsDesktop(mq.matches)
+    update()
+    mq.addEventListener('change', update)
+    return () => mq.removeEventListener('change', update)
+  }, [])
   const heroRef = useRef(null)
   const { scrollYProgress } = useScroll({
     target: heroRef,
@@ -395,11 +422,12 @@ export default function LandingPage() {
           aria-hidden="true"
           animate={{
             scale: [1, 1.08, 1],
-            opacity: [0.18, 0.25, 0.18],
+            opacity: [0.45, 0.6, 0.45],
           }}
           transition={{ duration: 6, repeat: Infinity, ease: 'easeInOut' }}
-          className="pointer-events-none absolute left-1/2 top-0 -translate-x-1/2 w-[900px] h-[600px] rounded-full"
+          className="pointer-events-none absolute left-1/2 top-0 w-[1100px] h-[700px] rounded-full"
           style={{
+            x: '-50%',
             background: 'radial-gradient(ellipse 60% 55% at 50% 0%, #F97316 0%, transparent 70%)',
           }}
         />
@@ -614,47 +642,81 @@ export default function LandingPage() {
             </p>
           </ScrollReveal>
 
-          <div className="grid gap-6 md:grid-cols-3 items-stretch">
-            {PLANS.map((plan, i) => (
-              <ScrollReveal key={plan.id} direction="up" delay={i * 0.12}>
+          <div className="grid gap-6 pt-8 md:grid-cols-3 items-center">
+            {PLANS.map((plan, i) => {
+              const highlightScale = plan.highlighted && isDesktop ? 1.06 : 1
+              return (
+              <ScrollReveal key={plan.id} direction="up" delay={i * 0.12} className="h-full">
                 <motion.div
-                  whileHover={{ y: -6 }}
+                  animate={{ scale: highlightScale }}
+                  whileHover={{ y: -6, scale: highlightScale }}
                   transition={{ type: 'spring', stiffness: 300, damping: 20 }}
                   className={clsx(
-                    'card card-shine relative flex flex-col h-full',
+                    'relative flex h-full flex-col rounded-2xl border shadow-[0_4px_16px_rgba(0,0,0,0.25)] transition-[border-color,box-shadow] duration-300',
                     plan.highlighted
-                      ? 'border-accent/50 shadow-[0_0_40px_rgba(249,115,22,0.15)] scale-[1.02]'
-                      : ''
+                      ? 'border-accent/60 bg-gradient-to-b from-[#1f1410] to-[#1a1a1a] p-7 md:py-9 shadow-[0_0_60px_-15px_rgba(249,115,22,0.35)] z-10'
+                      : 'border-white/[0.08] bg-[#1a1a1a] p-6 hover:border-white/[0.16]'
                   )}
                 >
                   {plan.highlighted && (
-                    <motion.span
-                      initial={{ y: -10, opacity: 0 }}
-                      animate={{ y: 0, opacity: 1 }}
-                      transition={{ delay: 0.5, type: 'spring', stiffness: 300 }}
-                      className="absolute -top-3.5 left-1/2 -translate-x-1/2 rounded-full bg-accent px-5 py-1 text-xs font-bold text-white shadow-[0_4px_12px_rgba(249,115,22,0.4)] animate-pulse-glow"
-                    >
-                      Más popular
-                    </motion.span>
+                    <>
+                      {/* Badge flotante — ahora visible porque no hay overflow:hidden */}
+                      <motion.span
+                        initial={{ y: -10, opacity: 0 }}
+                        animate={{ y: 0, opacity: 1 }}
+                        transition={{ delay: 0.5, type: 'spring', stiffness: 300 }}
+                        className="absolute -top-3 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full bg-gradient-to-r from-accent to-accent-strong px-4 py-1 text-[11px] font-bold uppercase tracking-wider text-white shadow-[0_6px_20px_-4px_rgba(249,115,22,0.6)]"
+                      >
+                        ★ Más popular
+                      </motion.span>
+                      {/* Glow interior decorativo */}
+                      <div
+                        aria-hidden="true"
+                        className="pointer-events-none absolute inset-0 rounded-2xl opacity-60"
+                        style={{
+                          background:
+                            'radial-gradient(ellipse 80% 40% at 50% 0%, rgba(249,115,22,0.18) 0%, transparent 70%)',
+                        }}
+                      />
+                    </>
                   )}
 
-                  <div className="mb-6">
-                    <p className="text-xs font-bold uppercase tracking-[0.15em] text-accent">
+                  <div className="relative mb-6">
+                    <p
+                      className={clsx(
+                        'text-[11px] font-bold uppercase tracking-[0.2em]',
+                        plan.highlighted ? 'text-accent' : 'text-foreground-subtle'
+                      )}
+                    >
                       {plan.name}
                     </p>
                     <div className="mt-3 flex items-end gap-1">
-                      <span className="text-5xl font-extrabold text-foreground">{plan.price}€</span>
-                      <span className="mb-1.5 text-sm text-foreground-subtle">/mes</span>
+                      <span className="text-5xl font-extrabold leading-none text-foreground">
+                        {plan.price}€
+                      </span>
+                      <span className="mb-1 text-sm text-foreground-subtle">/mes</span>
                     </div>
-                    <p className="mt-2 text-sm text-foreground-subtle">{plan.description}</p>
+                    <p className="mt-3 text-sm leading-relaxed text-foreground-subtle">
+                      {plan.description}
+                    </p>
                   </div>
 
-                  <div className="divider !my-0 mb-6" />
+                  <div className="relative mb-6 h-px w-full bg-gradient-to-r from-transparent via-white/10 to-transparent" />
 
-                  <ul className="mb-8 mt-6 flex-1 space-y-3">
+                  <ul className="relative mb-8 flex-1 space-y-3">
                     {plan.features.map((f) => (
-                      <li key={f} className="flex items-center gap-3 text-sm text-foreground">
-                        <span className="flex h-5 w-5 items-center justify-center rounded-full bg-success/10 text-success text-xs">
+                      <li
+                        key={f}
+                        className="flex items-start gap-3 text-sm leading-relaxed text-foreground"
+                      >
+                        <span
+                          className={clsx(
+                            'mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[11px] font-bold',
+                            plan.highlighted
+                              ? 'bg-accent text-white'
+                              : 'bg-success/10 text-success'
+                          )}
+                        >
                           ✓
                         </span>
                         {f}
@@ -667,9 +729,9 @@ export default function LandingPage() {
                     whileHover={{ scale: 1.02 }}
                     whileTap={{ scale: 0.98 }}
                     className={clsx(
-                      'block w-full rounded-full py-3 text-center text-sm font-semibold transition-all duration-200',
+                      'relative block w-full rounded-full py-3 text-center text-sm font-semibold transition-all duration-200',
                       plan.highlighted
-                        ? 'bg-accent text-white hover:bg-accent-strong shadow-[0_4px_16px_rgba(249,115,22,0.3)]'
+                        ? 'bg-accent text-white hover:bg-accent-strong shadow-[0_8px_24px_-6px_rgba(249,115,22,0.5)]'
                         : 'border border-white/[0.1] bg-background-elevated text-foreground hover:border-accent/40 hover:text-accent'
                     )}
                   >
@@ -677,7 +739,8 @@ export default function LandingPage() {
                   </motion.a>
                 </motion.div>
               </ScrollReveal>
-            ))}
+              )
+            })}
           </div>
         </div>
       </section>
@@ -782,11 +845,12 @@ export default function LandingPage() {
           aria-hidden="true"
           animate={{
             scale: [1, 1.1, 1],
-            opacity: [0.12, 0.2, 0.12],
+            opacity: [0.4, 0.55, 0.4],
           }}
           transition={{ duration: 5, repeat: Infinity, ease: 'easeInOut' }}
-          className="pointer-events-none absolute left-1/2 bottom-0 -translate-x-1/2 w-[700px] h-[400px] rounded-full"
+          className="pointer-events-none absolute left-1/2 bottom-0 w-[1100px] h-[600px] rounded-full"
           style={{
+            x: '-50%',
             background: 'radial-gradient(ellipse 60% 55% at 50% 100%, #F97316 0%, transparent 70%)',
           }}
         />

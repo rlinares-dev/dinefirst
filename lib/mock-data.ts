@@ -74,6 +74,11 @@ export const MOCK_RESTAURANTS: Restaurant[] = [
     phone: '+34 91 555 12 34',
     openingHours: 'Mar–Dom 13:00–16:00, 20:00–24:00',
     createdAt: '2026-01-15T00:00:00Z',
+    images: [
+      'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=800&auto=format&fit=crop',
+      'https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=800&auto=format&fit=crop',
+      'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=800&auto=format&fit=crop',
+    ],
   },
   {
     id: 'rest-2',
@@ -93,6 +98,11 @@ export const MOCK_RESTAURANTS: Restaurant[] = [
     phone: '+34 93 444 56 78',
     openingHours: 'Lun–Dom 12:00–16:00, 19:30–23:30',
     createdAt: '2026-01-20T00:00:00Z',
+    images: [
+      'https://images.unsplash.com/photo-1466978913421-dad2ebd01d17?w=800&auto=format&fit=crop',
+      'https://images.unsplash.com/photo-1600891964092-4316c288032e?w=800&auto=format&fit=crop',
+      'https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=800&auto=format&fit=crop',
+    ],
   },
   {
     id: 'rest-3',
@@ -112,6 +122,11 @@ export const MOCK_RESTAURANTS: Restaurant[] = [
     phone: '+34 91 777 89 01',
     openingHours: 'Mié–Dom 13:30–15:30, 20:30–23:00',
     createdAt: '2026-02-01T00:00:00Z',
+    images: [
+      'https://images.unsplash.com/photo-1579871494447-9811cf80d66c?w=800&auto=format&fit=crop',
+      'https://images.unsplash.com/photo-1553621042-f6e147245754?w=800&auto=format&fit=crop',
+      'https://images.unsplash.com/photo-1512058564366-18510be2db19?w=800&auto=format&fit=crop',
+    ],
   },
 ]
 

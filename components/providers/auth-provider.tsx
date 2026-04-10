@@ -153,13 +153,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [])
 
   const signInCamarero = useCallback(async (username: string, password: string, restaurantSlug: string) => {
-    if (!isSupabaseConfigured()) {
+    // Fallback al mock local — funciona en dev con o sin Supabase.
+    const tryMockLogin = () => {
       const { loginCamarero, setUser: saveUser } = require('@/lib/data')
       const u = loginCamarero(username, password, restaurantSlug)
       if (!u) return { error: 'Usuario, contraseña o restaurante incorrectos.' }
       saveUser(u)
       setUser(u)
       return { error: null }
+    }
+
+    if (!isSupabaseConfigured()) {
+      return tryMockLogin()
     }
 
     try {
@@ -172,7 +177,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         .select('id')
         .eq('slug', restaurantSlug)
         .single()
-      if (!restaurant) return { error: 'Restaurante no encontrado.' }
+
+      // Si el restaurante no existe en Supabase (p.ej. cuentas demo
+      // que solo viven en el mock), intentamos con localStorage.
+      if (!restaurant) {
+        console.info('[signInCamarero] Restaurante no en Supabase, fallback a mock')
+        return tryMockLogin()
+      }
 
       // Find camarero profile by username + restaurant
       const { data: profile } = await supabase
@@ -182,15 +193,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         .eq('username', username)
         .eq('restaurant_id', restaurant.id)
         .single()
-      if (!profile?.email) return { error: 'Usuario no encontrado en este restaurante.' }
+
+      if (!profile?.email) {
+        console.info('[signInCamarero] Camarero no en Supabase, fallback a mock')
+        return tryMockLogin()
+      }
 
       // Sign in with the internal email
       const { error } = await supabase.auth.signInWithPassword({ email: profile.email, password })
-      if (error) return { error: 'Contraseña incorrecta.' }
+      if (error) {
+        // Si Supabase rechaza, probamos mock como último recurso.
+        console.info('[signInCamarero] Supabase auth falló, fallback a mock:', error.message)
+        return tryMockLogin()
+      }
       return { error: null }
     } catch (err) {
-      console.error('signInCamarero error:', err)
-      return { error: 'Error al iniciar sesión.' }
+      console.error('signInCamarero error, fallback a mock:', err)
+      return tryMockLogin()
     }
   }, [])
 

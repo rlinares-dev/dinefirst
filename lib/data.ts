@@ -60,7 +60,18 @@ export function clearUser(): void {
 const KEY_USERS = 'df_users'
 
 export function getUsers(): User[] {
-  return load<User[]>(KEY_USERS, MOCK_USERS)
+  const stored = load<User[]>(KEY_USERS, MOCK_USERS)
+  // Migración: fusiona usuarios del mock que falten en localStorage
+  // (p.ej. camareros añadidos en versiones posteriores). Así un usuario
+  // que cacheó `df_users` antes de existir los camareros puede loguearse
+  // como empleado sin borrar su localStorage.
+  if (typeof window === 'undefined') return stored
+  const storedIds = new Set(stored.map((u) => u.id))
+  const missing = MOCK_USERS.filter((u) => !storedIds.has(u.id))
+  if (missing.length === 0) return stored
+  const merged = [...stored, ...missing]
+  save(KEY_USERS, merged)
+  return merged
 }
 
 export function loginWithCredentials(email: string, password: string): User | null {
@@ -70,12 +81,28 @@ export function loginWithCredentials(email: string, password: string): User | nu
 
 export function loginCamarero(username: string, password: string, restaurantSlug: string): User | null {
   if (password !== 'password123') return null
+
+  // Paso 1: intentar con los datos mock "limpios" (inmunes a contaminación
+  // desde Supabase en localStorage). Así las cuentas demo elena/diego
+  // funcionan aunque `df_restaurants` tenga UUIDs de Supabase.
+  const mockRestaurant = MOCK_RESTAURANTS.find((r) => r.slug === restaurantSlug)
+  if (mockRestaurant) {
+    const mockCamarero = MOCK_USERS.find(
+      (u) => u.role === 'camarero' && u.restaurantId === mockRestaurant.id && u.username === username,
+    )
+    if (mockCamarero) return mockCamarero
+  }
+
+  // Paso 2: intentar con lo que haya en localStorage (camareros creados
+  // desde el dashboard de "Equipo" se guardan aquí).
   const restaurants = load<Restaurant[]>(KEY_RESTAURANTS, MOCK_RESTAURANTS)
   const restaurant = restaurants.find((r) => r.slug === restaurantSlug)
   if (!restaurant) return null
-  return getUsers().find(
-    (u) => u.role === 'camarero' && u.restaurantId === restaurant.id && u.username === username
-  ) ?? null
+  return (
+    getUsers().find(
+      (u) => u.role === 'camarero' && u.restaurantId === restaurant.id && u.username === username,
+    ) ?? null
+  )
 }
 
 export function getRestaurantSlugs(): string[] {

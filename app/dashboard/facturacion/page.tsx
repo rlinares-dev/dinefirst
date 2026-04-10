@@ -42,6 +42,14 @@ export default function DashboardBillingPage() {
   const [upgradeModal, setUpgradeModal] = useState<string | null>(null)
   const [upgrading, setUpgrading] = useState(false)
   const [upgraded, setUpgraded] = useState(false)
+  const [paymentModal, setPaymentModal] = useState(false)
+  const [cancelModal, setCancelModal] = useState(false)
+  const [toast, setToast] = useState<string | null>(null)
+
+  function showToast(msg: string) {
+    setToast(msg)
+    setTimeout(() => setToast(null), 3000)
+  }
 
   async function handleUpgrade(planId: string) {
     setUpgrading(true)
@@ -51,6 +59,35 @@ export default function DashboardBillingPage() {
     setUpgraded(true)
     setUpgradeModal(null)
     setTimeout(() => setUpgraded(false), 3000)
+  }
+
+  function handleDownloadInvoice(invoice: (typeof INVOICES)[number]) {
+    const lines = [
+      'DineFirst — Factura',
+      '====================',
+      `Nº factura: ${invoice.id}`,
+      `Fecha:      ${invoice.date}`,
+      `Plan:       ${invoice.plan}`,
+      `Importe:    ${invoice.amount}€`,
+      `Estado:     Pagada`,
+      '',
+      'Gracias por confiar en DineFirst.',
+    ]
+    const blob = new Blob([lines.join('\n')], { type: 'text/plain;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `${invoice.id}.txt`
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(url)
+    showToast(`Factura ${invoice.id} descargada`)
+  }
+
+  function handleConfirmCancel() {
+    setCancelModal(false)
+    showToast('Tu plan se cancelará al final del periodo de facturación')
   }
 
   const current = PLANS.find((p) => p.id === currentPlan)
@@ -97,8 +134,13 @@ export default function DashboardBillingPage() {
         </div>
 
         <div className="mt-5 flex gap-3">
-          <button className="btn-secondary text-xs py-2">Gestionar método de pago</button>
-          <button className="rounded-md border border-red-500/20 px-4 py-2 text-xs text-red-400 hover:border-red-500/40 hover:bg-red-500/5 transition">
+          <button onClick={() => setPaymentModal(true)} className="btn-secondary text-xs py-2">
+            Gestionar método de pago
+          </button>
+          <button
+            onClick={() => setCancelModal(true)}
+            className="rounded-md border border-red-500/20 px-4 py-2 text-xs text-red-400 hover:border-red-500/40 hover:bg-red-500/5 transition"
+          >
             Cancelar plan
           </button>
         </div>
@@ -182,7 +224,10 @@ export default function DashboardBillingPage() {
                     </span>
                   </td>
                   <td className="px-4 py-3 text-right">
-                    <button className="text-xs text-accent hover:text-accent-soft">
+                    <button
+                      onClick={() => handleDownloadInvoice(inv)}
+                      className="text-xs text-accent hover:text-accent-soft"
+                    >
                       Descargar
                     </button>
                   </td>
@@ -223,6 +268,82 @@ export default function DashboardBillingPage() {
               </button>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Payment method modal */}
+      {paymentModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+          <div className="w-full max-w-md rounded-2xl border border-border-subtle bg-background-soft p-6 shadow-soft">
+            <h3 className="text-base font-semibold text-foreground">Método de pago</h3>
+            <p className="mt-2 text-sm text-foreground-subtle">
+              Tu método de pago actual.
+            </p>
+            <div className="mt-4 rounded-xl border border-border-subtle bg-background-elevated p-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="flex h-9 w-12 items-center justify-center rounded-md bg-gradient-to-br from-accent to-accent-strong text-[10px] font-bold text-white">
+                    VISA
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-foreground">•••• •••• •••• 4242</p>
+                    <p className="text-xs text-foreground-subtle">Caduca 12/2028</p>
+                  </div>
+                </div>
+                <span className="rounded-full border border-success/20 bg-success/10 px-2 py-0.5 text-[10px] text-success">
+                  Principal
+                </span>
+              </div>
+            </div>
+            <p className="mt-3 text-[11px] text-foreground-subtle">
+              Para cambiar tu tarjeta, conectaremos pronto con Stripe Billing Portal.
+            </p>
+            <div className="mt-5 flex gap-3">
+              <button
+                onClick={() => {
+                  setPaymentModal(false)
+                  showToast('Funcionalidad disponible próximamente vía Stripe')
+                }}
+                className="btn-primary flex-1"
+              >
+                Actualizar tarjeta
+              </button>
+              <button onClick={() => setPaymentModal(false)} className="btn-secondary">
+                Cerrar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Cancel plan modal */}
+      {cancelModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+          <div className="w-full max-w-sm rounded-2xl border border-red-500/20 bg-background-soft p-6 shadow-soft">
+            <h3 className="text-base font-semibold text-foreground">¿Cancelar tu plan?</h3>
+            <p className="mt-2 text-sm text-foreground-subtle">
+              Tu plan <strong className="text-foreground">{current?.name}</strong> seguirá activo hasta el final del
+              periodo de facturación. Después perderás el acceso a las funciones premium.
+            </p>
+            <div className="mt-5 flex gap-3">
+              <button
+                onClick={handleConfirmCancel}
+                className="flex-1 rounded-md border border-red-500/30 bg-red-500/10 py-2 text-xs font-medium text-red-400 hover:bg-red-500/20 transition"
+              >
+                Sí, cancelar plan
+              </button>
+              <button onClick={() => setCancelModal(false)} className="btn-secondary">
+                Volver
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Toast */}
+      {toast && (
+        <div className="fixed bottom-6 left-1/2 z-50 -translate-x-1/2 rounded-xl border border-border-subtle bg-background-soft px-4 py-3 text-sm text-foreground shadow-soft">
+          {toast}
         </div>
       )}
     </div>

@@ -123,12 +123,14 @@ export function GlobalNav() {
 
         {/* Nav links */}
         <div className="flex items-center gap-2 text-xs md:text-sm md:gap-3">
-          <a
-            href="/app"
-            className="link-underline hidden md:inline-flex items-center gap-1 rounded-full px-3 py-1.5 text-foreground-subtle transition-colors hover:text-foreground"
-          >
-            Explorar
-          </a>
+          {user && (
+            <a
+              href="/app"
+              className="link-underline hidden md:inline-flex items-center gap-1 rounded-full px-3 py-1.5 text-foreground-subtle transition-colors hover:text-foreground"
+            >
+              Explorar
+            </a>
+          )}
 
           <AnimatePresence mode="wait" initial={false}>
             {user ? (

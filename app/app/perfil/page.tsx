@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { getUser, setUser, clearUser, getReservationsForUser } from '@/lib/data'
+import { isSupabaseConfigured } from '@/lib/env'
 import type { User, Reservation } from '@/types/database'
 
 export default function AppProfilePage() {
@@ -10,6 +11,44 @@ export default function AppProfilePage() {
   const [form, setForm] = useState({ name: '', email: '', phone: '' })
   const [saved, setSaved] = useState(false)
   const [activeTab, setActiveTab] = useState<'profile' | 'security'>('profile')
+  const [pwForm, setPwForm] = useState({ current: '', next: '', confirm: '' })
+  const [pwState, setPwState] = useState<{ loading: boolean; error: string | null; success: boolean }>({
+    loading: false,
+    error: null,
+    success: false,
+  })
+
+  async function handleChangePassword(e: React.FormEvent) {
+    e.preventDefault()
+    setPwState({ loading: true, error: null, success: false })
+    if (pwForm.next.length < 8) {
+      setPwState({ loading: false, error: 'La contraseña debe tener al menos 8 caracteres', success: false })
+      return
+    }
+    if (pwForm.next !== pwForm.confirm) {
+      setPwState({ loading: false, error: 'Las contraseñas no coinciden', success: false })
+      return
+    }
+    try {
+      if (isSupabaseConfigured()) {
+        const { createClient } = await import('@/lib/supabase/client')
+        const supabase = createClient()
+        const { error } = await supabase.auth.updateUser({ password: pwForm.next })
+        if (error) throw error
+      } else {
+        await new Promise((r) => setTimeout(r, 600))
+      }
+      setPwState({ loading: false, error: null, success: true })
+      setPwForm({ current: '', next: '', confirm: '' })
+      setTimeout(() => setPwState((s) => ({ ...s, success: false })), 3000)
+    } catch (err) {
+      setPwState({
+        loading: false,
+        error: err instanceof Error ? err.message : 'No se pudo cambiar la contraseña',
+        success: false,
+      })
+    }
+  }
 
   useEffect(() => {
     const u = getUser()
@@ -154,36 +193,61 @@ export default function AppProfilePage() {
         )}
 
         {activeTab === 'security' && (
-          <div className="card space-y-5">
+          <form onSubmit={handleChangePassword} className="card space-y-5">
             <div>
               <h3 className="text-sm font-semibold text-foreground mb-1">Cambiar contraseña</h3>
-              <p className="text-xs text-foreground-subtle">La integración con Supabase Auth estará disponible en la Fase 1 del roadmap.</p>
+              <p className="text-xs text-foreground-subtle">
+                {isSupabaseConfigured()
+                  ? 'Actualiza la contraseña asociada a tu cuenta.'
+                  : 'Modo demo: el cambio es simulado, no persiste sin Supabase.'}
+              </p>
             </div>
             <div className="space-y-3">
-              {['Contraseña actual', 'Nueva contraseña', 'Confirmar nueva contraseña'].map((label) => (
-                <div key={label}>
-                  <label className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-foreground-subtle">{label}</label>
+              {[
+                { label: 'Contraseña actual', key: 'current' as const },
+                { label: 'Nueva contraseña', key: 'next' as const },
+                { label: 'Confirmar nueva contraseña', key: 'confirm' as const },
+              ].map(({ label, key }) => (
+                <div key={key}>
+                  <label className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-foreground-subtle">
+                    {label}
+                  </label>
                   <input
                     type="password"
-                    disabled
+                    value={pwForm[key]}
+                    onChange={(e) => setPwForm((p) => ({ ...p, [key]: e.target.value }))}
                     placeholder="••••••••"
-                    className="w-full rounded-md border border-border-subtle bg-background-elevated px-3 py-2.5 text-sm text-foreground-subtle opacity-40 cursor-not-allowed outline-none"
+                    className="w-full rounded-md border border-border-subtle bg-background-elevated px-3 py-2.5 text-sm text-foreground outline-none focus:border-accent/40"
                   />
                 </div>
               ))}
             </div>
-            <button disabled className="btn-secondary w-full opacity-40 cursor-not-allowed">
-              Cambiar contraseña (próximamente)
+            {pwState.error && (
+              <p className="rounded-md border border-red-500/20 bg-red-500/10 px-3 py-2 text-xs text-red-400">
+                {pwState.error}
+              </p>
+            )}
+            {pwState.success && (
+              <p className="rounded-md border border-success/20 bg-success/10 px-3 py-2 text-xs text-success">
+                ✓ Contraseña actualizada correctamente
+              </p>
+            )}
+            <button
+              type="submit"
+              disabled={pwState.loading}
+              className="btn-primary w-full disabled:opacity-60"
+            >
+              {pwState.loading ? 'Guardando…' : 'Cambiar contraseña'}
             </button>
 
             <div className="border-t border-border-subtle pt-5">
               <h3 className="text-sm font-semibold text-foreground mb-1">Conectar con Google</h3>
               <p className="text-xs text-foreground-subtle mb-3">Accede de forma rápida con tu cuenta de Google.</p>
-              <button disabled className="btn-secondary opacity-40 cursor-not-allowed text-xs">
-                🔒 OAuth disponible en Fase 1
+              <button type="button" disabled className="btn-secondary opacity-40 cursor-not-allowed text-xs">
+                🔒 OAuth disponible próximamente
               </button>
             </div>
-          </div>
+          </form>
         )}
       </div>
     </main>

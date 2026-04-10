@@ -137,7 +137,7 @@ export default function DashboardHomePage() {
     { label: 'Pedidos hoy', value: todayOrders.length, sub: `${activeSessions} sesiones activas`, color: 'text-emerald-400', sensitive: false },
     { label: 'Ingresos', value: `${todayRevenue.toFixed(0)}€`, sub: `${allOrders.length} pedidos total`, color: 'text-success', sensitive: true },
     { label: 'Ocupacion est.', value: `${Math.min(occupancyPct, 100)}%`, sub: `Capacidad: ${restaurant?.capacity ?? 0}`, color: 'text-success', sensitive: false },
-    { label: 'Rating', value: restaurant?.rating ?? 0, sub: `${restaurant?.reviewCount ?? 0} resenas`, color: 'text-accent-soft', sensitive: false },
+    { label: 'Rating', value: restaurant?.rating ?? 0, sub: `${restaurant?.reviewCount ?? 0} reseñas`, color: 'text-accent-soft', sensitive: false },
   ]
   const stats = isCamarero ? allStats.filter((s) => !s.sensitive) : allStats
 
